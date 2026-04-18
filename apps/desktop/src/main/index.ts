@@ -28,7 +28,7 @@ function createWindow(): void {
     backgroundColor: BRAND.backgroundColor,
     show: false,
     webPreferences: {
-      preload: join(__dirname, '../preload/index.mjs'),
+      preload: join(__dirname, '../preload/index.cjs'),
       sandbox: true,
       contextIsolation: true,
       nodeIntegration: false,
