@@ -8,6 +8,7 @@
  * Call initInMemoryDb() in tests to get an isolated in-memory instance.
  */
 
+import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import type {
@@ -34,13 +35,22 @@ let singleton: Database | null = null;
  * so that one `pnpm install` covers both runtimes without
  * an electron-rebuild step that toggles the single default binary.
  */
+export function resolveNativeBindingPath(
+  releaseDir: string,
+  isElectron = typeof process.versions.electron === 'string',
+): string {
+  const runtimeSpecific = path.join(
+    releaseDir,
+    isElectron ? 'better_sqlite3.node-electron.node' : 'better_sqlite3.node-node.node',
+  );
+  if (fs.existsSync(runtimeSpecific)) return runtimeSpecific;
+  if (isElectron) return path.join(releaseDir, 'better_sqlite3.node');
+  return runtimeSpecific;
+}
+
 function resolveNativeBinding(): string {
-  const isElectron = typeof process.versions.electron === 'string';
-  const filename = isElectron
-    ? 'better_sqlite3.node-electron.node'
-    : 'better_sqlite3.node-node.node';
   const pkgJson = require.resolve('better-sqlite3/package.json');
-  return path.join(path.dirname(pkgJson), 'build', 'Release', filename);
+  return resolveNativeBindingPath(path.join(path.dirname(pkgJson), 'build', 'Release'));
 }
 
 function openDatabase(filename: string, options?: BetterSqlite3.Options): Database {

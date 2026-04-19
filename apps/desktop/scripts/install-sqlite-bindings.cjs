@@ -15,7 +15,7 @@
  * `nativeBinding` constructor option, depending on whether process.versions.electron
  * is defined.
  *
- * Idempotent — skips downloads when both stashed binaries already match the
+ * Idempotent - skips downloads when both stashed binaries already match the
  * recorded versions in install-sqlite-bindings.lock.json. Safe to re-run on
  * every install.
  *
@@ -51,28 +51,77 @@ function resolveElectronVersion() {
   }
 }
 
-function downloadPrebuild({ pkgDir, runtime, target, arch, platform, dest }) {
-  const prebuildBin = path.join(pkgDir, 'node_modules', '.bin', 'prebuild-install');
-  if (!fs.existsSync(prebuildBin)) {
+function resolvePrebuildInstallEntrypoint(pkgDir) {
+  try {
+    return require.resolve('prebuild-install/bin.js', { paths: [pkgDir] });
+  } catch {
     throw new Error(
-      `prebuild-install not found at ${prebuildBin} — better-sqlite3 install layout changed?`,
+      `prebuild-install/bin.js could not be resolved from ${pkgDir} - better-sqlite3 install layout changed?`,
     );
   }
+}
+
+function runPrebuildInstall({ pkgDir, runtime, target, arch, platform }) {
+  const prebuildEntrypoint = resolvePrebuildInstallEntrypoint(pkgDir);
+  try {
+    const output = execFileSync(
+      process.execPath,
+      [
+        prebuildEntrypoint,
+        `--runtime=${runtime}`,
+        `--target=${target}`,
+        `--arch=${arch}`,
+        `--platform=${platform}`,
+      ],
+      { cwd: pkgDir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
+    );
+    if (output) process.stdout.write(output);
+  } catch (error) {
+    if (error && typeof error === 'object') {
+      if (typeof error.stdout === 'string' && error.stdout.length > 0)
+        process.stdout.write(error.stdout);
+      if (typeof error.stderr === 'string' && error.stderr.length > 0)
+        process.stderr.write(error.stderr);
+    }
+    throw error;
+  }
+}
+
+function isMissingPrebuild(error) {
+  const stdout =
+    error && typeof error === 'object' && 'stdout' in error && typeof error.stdout === 'string'
+      ? error.stdout
+      : '';
+  const stderr =
+    error && typeof error === 'object' && 'stderr' in error && typeof error.stderr === 'string'
+      ? error.stderr
+      : '';
+  const message =
+    error instanceof Error ? error.message : typeof error === 'string' ? error : String(error);
+  return /No prebuilt binaries found/i.test(`${stdout}\n${stderr}\n${message}`);
+}
+
+function downloadPrebuild({ pkgDir, runtime, target, arch, platform, dest, optional }) {
   const defaultBinary = path.join(pkgDir, 'build', 'Release', 'better_sqlite3.node');
   // Move out of the way so prebuild-install doesn't short-circuit.
   if (fs.existsSync(defaultBinary)) fs.rmSync(defaultBinary);
 
-  execFileSync(
-    prebuildBin,
-    [`--runtime=${runtime}`, `--target=${target}`, `--arch=${arch}`, `--platform=${platform}`],
-    { cwd: pkgDir, stdio: 'inherit' },
-  );
+  try {
+    runPrebuildInstall({ pkgDir, runtime, target, arch, platform });
+  } catch (error) {
+    if (optional && isMissingPrebuild(error)) {
+      log(`no published prebuild for ${runtime}@${target} (${platform}-${arch}); skipping`);
+      return false;
+    }
+    throw error;
+  }
 
   if (!fs.existsSync(defaultBinary)) {
     throw new Error(`prebuild-install for ${runtime}@${target} did not produce ${defaultBinary}`);
   }
   fs.copyFileSync(defaultBinary, dest);
   fs.rmSync(defaultBinary);
+  return true;
 }
 
 function main() {
@@ -104,6 +153,8 @@ function main() {
     platform,
     nodeVersion,
     electronVersion,
+    hasNodeBinary: fs.existsSync(nodeBinary),
+    hasElectronBinary: fs.existsSync(electronBinary),
   };
 
   const upToDate =
@@ -113,47 +164,65 @@ function main() {
     lock.platform === platform &&
     lock.nodeVersion === nodeVersion &&
     lock.electronVersion === electronVersion &&
-    fs.existsSync(nodeBinary) &&
-    (electronVersion === null || fs.existsSync(electronBinary));
+    lock.hasNodeBinary === targetLock.hasNodeBinary &&
+    lock.hasElectronBinary === targetLock.hasElectronBinary &&
+    (!targetLock.hasNodeBinary || fs.existsSync(nodeBinary)) &&
+    (!targetLock.hasElectronBinary || fs.existsSync(electronBinary));
 
   if (upToDate) {
     log(
-      `up-to-date (node=${nodeVersion}, electron=${electronVersion ?? 'skipped'}, ${platform}-${arch}) — skipping`,
+      `up-to-date (node=${nodeVersion}, electron=${electronVersion ?? 'skipped'}, ${platform}-${arch}) - skipping`,
     );
     return;
   }
 
   log(`downloading Node prebuild (node=${nodeVersion}, ${platform}-${arch})`);
-  downloadPrebuild({
+  const hasNodeBinary = downloadPrebuild({
     pkgDir,
     runtime: 'node',
     target: nodeVersion,
     arch,
     platform,
     dest: nodeBinary,
+    optional: true,
   });
 
+  let hasElectronBinary = false;
   if (electronVersion === null) {
     log('electron not installed; skipping Electron native binding (fine for prod-only installs)');
   } else {
     log(`downloading Electron prebuild (electron=${electronVersion}, ${platform}-${arch})`);
-    downloadPrebuild({
+    hasElectronBinary = downloadPrebuild({
       pkgDir,
       runtime: 'electron',
       target: electronVersion,
       arch,
       platform,
       dest: electronBinary,
+      optional: false,
     });
   }
 
-  // Leave a default copy in place so any consumer that doesn't pass nativeBinding
-  // (e.g. ad-hoc node REPL inside this monorepo) still gets a working module
-  // matching the active runtime.
-  const defaultBinary = path.join(releaseDir, 'better_sqlite3.node');
-  fs.copyFileSync(nodeBinary, defaultBinary);
+  if (!hasNodeBinary && !hasElectronBinary) {
+    throw new Error('Failed to stage any better-sqlite3 native bindings');
+  }
 
-  fs.writeFileSync(lockPath, `${JSON.stringify(targetLock, null, 2)}\n`);
+  // Leave a default copy in place so any consumer that doesn't pass nativeBinding
+  // (e.g. ad-hoc node REPL inside this monorepo) still gets a working module.
+  // Prefer the Node binary when available; otherwise fall back to the Electron
+  // binary so the desktop app still boots on machines where upstream has not
+  // published a Node prebuild for the active version yet.
+  const defaultBinary = path.join(releaseDir, 'better_sqlite3.node');
+  if (hasNodeBinary) {
+    fs.copyFileSync(nodeBinary, defaultBinary);
+  } else if (hasElectronBinary) {
+    fs.copyFileSync(electronBinary, defaultBinary);
+  }
+
+  fs.writeFileSync(
+    lockPath,
+    `${JSON.stringify({ ...targetLock, hasNodeBinary, hasElectronBinary }, null, 2)}\n`,
+  );
   log('done');
 }
 

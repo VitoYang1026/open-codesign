@@ -32,6 +32,9 @@
     "version-packages": "changeset version",
     "release": "turbo run build && changeset publish"
   },
+  "pnpm": {
+    "neverBuiltDependencies": ["better-sqlite3"]
+  },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
     "@changesets/cli": "^2.27.11",
