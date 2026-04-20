@@ -1,10 +1,9 @@
 import { useT } from '@open-codesign/i18n';
 import { IconButton, Tooltip, Wordmark } from '@open-codesign/ui';
-import { Command, Settings as SettingsIcon } from 'lucide-react';
+import { Command, FolderOpen, Settings as SettingsIcon } from 'lucide-react';
 import type { CSSProperties } from 'react';
 import { useCodesignStore } from '../store';
 import { ConnectionStatusDot } from './ConnectionStatusDot';
-import { DesignSwitcher } from './DesignSwitcher';
 import { LanguageToggle } from './LanguageToggle';
 import { ThemeToggle } from './ThemeToggle';
 
@@ -111,16 +110,30 @@ export function TopBar() {
   const t = useT();
   const setView = useCodesignStore((s) => s.setView);
   const openCommandPalette = useCodesignStore((s) => s.openCommandPalette);
+  const currentDesignId = useCodesignStore((s) => s.currentDesignId);
+  const designs = useCodesignStore((s) => s.designs);
+  const currentDesign = designs.find((d) => d.id === currentDesignId);
 
   return (
     <header
       className="h-[var(--size-titlebar-height)] shrink-0 flex items-center justify-between pl-[var(--size-titlebar-pad-left)] pr-[var(--space-4)] border-b border-[var(--color-border)] bg-[var(--color-background)] select-none"
       style={dragStyle}
     >
-      <div className="flex items-center gap-[var(--space-3)] min-w-0">
+      <div className="flex items-center gap-[var(--space-3)] min-w-0" style={noDragStyle}>
         <Wordmark badge={t('common.preAlpha')} size="sm" />
         <span className="text-[var(--color-text-muted)]">/</span>
-        <DesignSwitcher />
+        <Tooltip label={t('topbar.openMyDesigns') ?? 'My designs'}>
+          <button
+            type="button"
+            onClick={() => setView('hub')}
+            className="inline-flex items-center gap-[var(--space-1)] rounded-[var(--radius-sm)] px-[var(--space-2)] py-[var(--space-1)] text-[var(--text-sm)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)] transition-colors max-w-[280px]"
+          >
+            <FolderOpen className="w-3.5 h-3.5 shrink-0" aria-hidden />
+            <span className="truncate">
+              {currentDesign?.name ?? t('sidebar.noDesign')}
+            </span>
+          </button>
+        </Tooltip>
         <ConnectionStatusDot />
       </div>
 

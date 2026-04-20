@@ -701,6 +701,12 @@ function applyGenerateSuccess(
     };
   });
   if (didApply) {
+    // Workstream G — auto-open the generated file as a tab so the user sees
+    // the preview immediately. For Phase 1 the only file is `index.html`;
+    // post-Workstream E we'll use the file the agent actually wrote.
+    if (firstArtifact) {
+      get().openCanvasFileTab('index.html');
+    }
     // Prefer the designId captured when the prompt was sent — if the user
     // switched designs mid-generation, get().currentDesignId would now point
     // at the new one and we'd write the artifact + assistant text into the
@@ -1477,6 +1483,8 @@ export const useCodesignStore = create<CodesignState>((set, get) => ({
         commentsLoaded: false,
         commentBubble: null,
         currentSnapshotId: null,
+        canvasTabs: [FILES_TAB],
+        activeCanvasTab: 0,
       });
       await get().loadDesigns();
       void get().loadChatForCurrentDesign();
@@ -1527,6 +1535,10 @@ export const useCodesignStore = create<CodesignState>((set, get) => ({
         commentsLoaded: false,
         commentBubble: null,
         currentSnapshotId: null,
+        // Workstream G — reset tabs on design switch; auto-open index.html if
+        // the freshly-loaded design has an artifact.
+        canvasTabs: latest ? [FILES_TAB, { kind: 'file', path: 'index.html' }] : [FILES_TAB],
+        activeCanvasTab: latest ? 1 : 0,
       });
       void get().loadChatForCurrentDesign();
       void get().loadCommentsForCurrentDesign();

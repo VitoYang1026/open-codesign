@@ -178,6 +178,28 @@ function applyAdditiveMigrations(db: Database): void {
     db.exec('ALTER TABLE designs ADD COLUMN deleted_at TEXT');
     db.exec('CREATE INDEX IF NOT EXISTS idx_designs_deleted_at ON designs(deleted_at)');
   }
+
+  // One-shot cleanup: chat_messages rows written before the designId race
+  // fixes (commits 2a316b7 / f41d1f8) may carry the wrong design_id and
+  // cross-contaminate the Sidebar history. Clear the table once; the next
+  // open of any design will re-seed from snapshots with the correct id.
+  // Gated by a meta row so it only runs once per install.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS db_meta (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    )
+  `);
+  const flag = db
+    .prepare('SELECT value FROM db_meta WHERE key = ?')
+    .get('chat_messages_purged_2026_04_20') as { value?: string } | undefined;
+  if (flag === undefined) {
+    db.exec('DELETE FROM chat_messages');
+    db.prepare('INSERT INTO db_meta (key, value) VALUES (?, ?)').run(
+      'chat_messages_purged_2026_04_20',
+      new Date().toISOString(),
+    );
+  }
 }
 
 /** Initialize and return the singleton DB instance for production use. */
