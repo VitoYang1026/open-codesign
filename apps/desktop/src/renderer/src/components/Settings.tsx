@@ -698,6 +698,11 @@ function ProviderCard({
               <AlertTriangle className="w-2.5 h-2.5" />
               {t('settings.providers.decryptionFailed')}
             </span>
+          ) : row.hasKey === false ? (
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full border border-[var(--color-warning,_#d97706)] text-[var(--color-warning,_#d97706)] text-[var(--font-size-badge)] font-medium leading-none">
+              <AlertTriangle className="w-2.5 h-2.5" />
+              {t('settings.providers.missingKey')}
+            </span>
           ) : (
             <code className="text-[var(--text-xs)] text-[var(--color-text-muted)] font-mono">
               {row.maskedKey}
@@ -717,13 +722,22 @@ function ProviderCard({
               {t('settings.providers.active')}
             </span>
           )}
-          {!row.isActive && !hasError && (
+          {!row.isActive && !hasError && row.hasKey !== false && (
             <button
               type="button"
               onClick={() => onActivate(row.provider)}
               className="h-7 px-2.5 rounded-[var(--radius-sm)] text-[var(--text-xs)] text-[var(--color-text-secondary)] border border-[var(--color-border)] bg-[var(--color-surface)] hover:bg-[var(--color-surface-hover)] transition-colors"
             >
               {t('settings.providers.setActive')}
+            </button>
+          )}
+          {row.hasKey === false && !hasError && (
+            <button
+              type="button"
+              onClick={() => onReEnterKey(row.provider as SupportedOnboardingProvider)}
+              className="h-7 px-2.5 rounded-[var(--radius-sm)] text-[var(--text-xs)] text-[var(--color-warning,_#d97706)] border border-[var(--color-warning,_#d97706)] bg-[var(--color-surface)] hover:opacity-80 transition-opacity"
+            >
+              {t('settings.providers.addKey')}
             </button>
           )}
           {hasError && (

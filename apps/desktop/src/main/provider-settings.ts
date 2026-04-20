@@ -18,6 +18,7 @@ export interface ProviderRow {
   builtin: boolean;
   wire: WireApi;
   defaultModel: string;
+  hasKey: boolean;
   error?: 'decryption_failed' | string;
 }
 
@@ -69,18 +70,28 @@ export function toProviderRows(
   if (cfg === null) return [];
 
   const rows: ProviderRow[] = [];
-  for (const [provider, ref] of Object.entries(cfg.secrets)) {
-    if (ref === undefined) continue;
+  // Iterate the union of provider entries and stored secrets so that
+  // providers added without an API key (e.g. a Codex import where the
+  // env_key var wasn't exported) still surface as a row the user can
+  // complete via "Edit". Otherwise they'd silently disappear.
+  const allIds = new Set<string>([
+    ...Object.keys(cfg.providers ?? {}),
+    ...Object.keys(cfg.secrets ?? {}),
+  ]);
+  for (const provider of allIds) {
+    const ref = cfg.secrets?.[provider];
     const entry = resolveEntryFor(cfg, provider);
 
-    let maskedKey: string;
+    let maskedKey = '';
     let rowError: ProviderRow['error'];
-    try {
-      const plain = decrypt(ref.ciphertext);
-      maskedKey = maskKey(plain);
-    } catch {
-      maskedKey = '';
-      rowError = 'decryption_failed';
+    if (ref !== undefined) {
+      try {
+        const plain = decrypt(ref.ciphertext);
+        maskedKey = maskKey(plain);
+      } catch {
+        maskedKey = '';
+        rowError = 'decryption_failed';
+      }
     }
 
     const label =
@@ -100,6 +111,7 @@ export function toProviderRows(
         (isSupportedOnboardingProvider(provider)
           ? PROVIDER_SHORTLIST[provider].defaultPrimary
           : ''),
+      hasKey: ref !== undefined,
       ...(rowError !== undefined ? { error: rowError } : {}),
     });
   }

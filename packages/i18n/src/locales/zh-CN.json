@@ -147,6 +147,8 @@
       "decryptionFailed": "解密失败",
       "setActive": "设为当前",
       "reEnterKey": "重新输入 Key",
+      "missingKey": "缺少 Key",
+      "addKey": "添加 Key",
       "confirm": "确认",
       "delete": "删除",
       "testConnection": "测试连接",

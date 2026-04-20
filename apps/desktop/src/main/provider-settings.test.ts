@@ -77,10 +77,11 @@ describe('toProviderRows', () => {
       throw new Error('safeStorage unavailable');
     });
 
-    expect(rows).toHaveLength(1);
-    expect(rows[0]?.error).toBe('decryption_failed');
-    expect(rows[0]?.maskedKey).toBe('');
-    expect(rows[0]?.provider).toBe('openai');
+    const openaiRow = rows.find((r) => r.provider === 'openai');
+    expect(openaiRow).toBeDefined();
+    expect(openaiRow?.error).toBe('decryption_failed');
+    expect(openaiRow?.maskedKey).toBe('');
+    expect(openaiRow?.hasKey).toBe(true);
   });
 
   it('returns a normal masked row when decrypt succeeds', () => {
@@ -92,10 +93,26 @@ describe('toProviderRows', () => {
 
     const rows = toProviderRows(cfg, () => 'sk-ant-api03-abcdefghijklmnop');
 
-    expect(rows).toHaveLength(1);
-    expect(rows[0]?.error).toBeUndefined();
-    expect(rows[0]?.maskedKey).toMatch(/sk-.*\*{3}/);
-    expect(rows[0]?.isActive).toBe(true);
+    const anthropicRow = rows.find((r) => r.provider === 'anthropic');
+    expect(anthropicRow).toBeDefined();
+    expect(anthropicRow?.error).toBeUndefined();
+    expect(anthropicRow?.maskedKey).toMatch(/sk-.*\*{3}/);
+    expect(anthropicRow?.isActive).toBe(true);
+    expect(anthropicRow?.hasKey).toBe(true);
+  });
+
+  it('surfaces keyless providers as rows with hasKey:false', () => {
+    const cfg = makeCfg({
+      provider: 'openai',
+      modelPrimary: 'gpt-4o',
+      secrets: { openai: { ciphertext: 'enc' } },
+    });
+
+    const rows = toProviderRows(cfg, () => 'sk-test-token-1234567890');
+    const anthropicRow = rows.find((r) => r.provider === 'anthropic');
+    expect(anthropicRow).toBeDefined();
+    expect(anthropicRow?.hasKey).toBe(false);
+    expect(anthropicRow?.maskedKey).toBe('');
   });
 });
 
