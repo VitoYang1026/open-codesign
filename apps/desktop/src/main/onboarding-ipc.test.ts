@@ -190,10 +190,22 @@ describe('getApiKeyForProvider — API key retrieval', () => {
     // Override readConfig to return a config with an anthropic secret.
     const { readConfig } = await import('./config');
     vi.mocked(readConfig).mockResolvedValueOnce({
-      version: 2,
+      version: 3,
+      activeProvider: 'anthropic',
+      activeModel: 'claude-sonnet-4-6',
+      secrets: { anthropic: { ciphertext: 'enc:sk-ant-test' } },
+      providers: {
+        anthropic: {
+          id: 'anthropic',
+          name: 'Anthropic Claude',
+          builtin: true,
+          wire: 'anthropic',
+          baseUrl: 'https://api.anthropic.com',
+          defaultModel: 'claude-sonnet-4-6',
+        },
+      },
       provider: 'anthropic',
       modelPrimary: 'claude-sonnet-4-6',
-      secrets: { anthropic: { ciphertext: 'enc:sk-ant-test' } },
       baseUrls: {},
     });
 

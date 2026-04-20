@@ -2,7 +2,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import * as TOML from '@iarna/toml';
-import { CodesignError, type Config, ConfigSchema } from '@open-codesign/shared';
+import { CodesignError, type Config, parseConfigFlexible, toPersistedV3 } from '@open-codesign/shared';
 
 const XDG_DEFAULT = join(homedir(), '.config', 'open-codesign');
 
@@ -37,23 +37,39 @@ export async function readConfig(): Promise<Config | null> {
     });
   }
 
-  const validated = ConfigSchema.safeParse(parsed);
-  if (!validated.success) {
+  const validated = safeParseConfig(parsed);
+  if (!validated.ok) {
     throw new CodesignError(
-      `Config at ${path} does not match the expected schema: ${validated.error.message}`,
+      `Config at ${path} does not match the expected schema: ${validated.error}`,
       'CONFIG_SCHEMA_INVALID',
-      { cause: validated.error },
+      { cause: validated.cause },
     );
   }
   return validated.data;
 }
 
+function safeParseConfig(
+  parsed: unknown,
+):
+  | { ok: true; data: Config }
+  | { ok: false; error: string; cause: unknown } {
+  try {
+    return { ok: true, data: parseConfigFlexible(parsed) };
+  } catch (err) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : String(err),
+      cause: err,
+    };
+  }
+}
+
 export async function writeConfig(config: Config): Promise<void> {
-  const validated = ConfigSchema.parse(config);
+  const persisted = toPersistedV3(config);
   const dir = configDir();
   await mkdir(dir, { recursive: true });
   const path = configPath();
-  const body = TOML.stringify(validated as unknown as TOML.JsonMap);
+  const body = TOML.stringify(persisted as unknown as TOML.JsonMap);
   await writeFile(path, body, { encoding: 'utf8', mode: 0o600 });
 }
 

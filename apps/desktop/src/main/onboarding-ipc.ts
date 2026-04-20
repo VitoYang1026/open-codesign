@@ -1,11 +1,14 @@
 import { type ValidateResult, pingProvider } from '@open-codesign/providers';
 import {
+  BUILTIN_PROVIDERS,
   CodesignError,
   type Config,
   type OnboardingState,
+  type ProviderEntry,
   StoredDesignSystem,
   type StoredDesignSystem as StoredDesignSystemValue,
   type SupportedOnboardingProvider,
+  hydrateConfig,
   isSupportedOnboardingProvider,
 } from '@open-codesign/shared';
 import { configDir, configPath, readConfig, writeConfig } from './config';
@@ -24,7 +27,7 @@ import { buildAppPaths } from './storage-settings';
 const logger = getLogger('settings-ipc');
 
 interface SaveKeyInput {
-  provider: SupportedOnboardingProvider;
+  provider: string;
   apiKey: string;
   modelPrimary: string;
   baseUrl?: string;
@@ -71,8 +74,7 @@ export function getApiKeyForProvider(provider: string): string {
 export function getBaseUrlForProvider(provider: string): string | undefined {
   const cfg = getCachedConfig();
   if (cfg === null) return undefined;
-  const ref = cfg.baseUrls?.[provider as keyof typeof cfg.baseUrls];
-  return ref?.baseUrl;
+  return cfg.providers[provider]?.baseUrl;
 }
 
 function toState(cfg: Config | null): OnboardingState {
@@ -85,20 +87,12 @@ function toState(cfg: Config | null): OnboardingState {
       designSystem: null,
     };
   }
-  if (!isSupportedOnboardingProvider(cfg.provider)) {
-    return {
-      hasKey: false,
-      provider: null,
-      modelPrimary: null,
-      baseUrl: null,
-      designSystem: cfg.designSystem ?? null,
-    };
-  }
-  const ref = cfg.secrets[cfg.provider];
+  const active = cfg.activeProvider;
+  const ref = cfg.secrets[active];
   if (ref === undefined) {
     return {
       hasKey: false,
-      provider: cfg.provider,
+      provider: active,
       modelPrimary: null,
       baseUrl: null,
       designSystem: cfg.designSystem ?? null,
@@ -106,9 +100,9 @@ function toState(cfg: Config | null): OnboardingState {
   }
   return {
     hasKey: true,
-    provider: cfg.provider,
-    modelPrimary: cfg.modelPrimary,
-    baseUrl: cfg.baseUrls?.[cfg.provider]?.baseUrl ?? null,
+    provider: active,
+    modelPrimary: cfg.activeModel,
+    baseUrl: cfg.providers[active]?.baseUrl ?? null,
     designSystem: cfg.designSystem ?? null,
   };
 }
@@ -127,13 +121,14 @@ export async function setDesignSystem(
       'CONFIG_MISSING',
     );
   }
-  const next: Config = {
-    ...cfg,
-    ...(designSystem ? { designSystem: StoredDesignSystem.parse(designSystem) } : {}),
-  };
-  if (designSystem === null) {
-    next.designSystem = undefined;
-  }
+  const next: Config = hydrateConfig({
+    version: 3,
+    activeProvider: cfg.activeProvider,
+    activeModel: cfg.activeModel,
+    secrets: cfg.secrets,
+    providers: cfg.providers,
+    ...(designSystem !== null ? { designSystem: StoredDesignSystem.parse(designSystem) } : {}),
+  });
   await writeConfig(next);
   cachedConfig = next;
   configLoaded = true;
@@ -149,10 +144,10 @@ function parseSaveKey(raw: unknown): SaveKeyInput {
   const apiKey = r['apiKey'];
   const modelPrimary = r['modelPrimary'];
   const baseUrl = r['baseUrl'];
-  if (typeof provider !== 'string' || !isSupportedOnboardingProvider(provider)) {
+  if (typeof provider !== 'string' || provider.trim().length === 0) {
     throw new CodesignError(
-      `Provider "${String(provider)}" is not supported in v0.1.`,
-      'PROVIDER_NOT_SUPPORTED',
+      `Provider "${String(provider)}" is invalid.`,
+      'IPC_BAD_INPUT',
     );
   }
   if (typeof apiKey !== 'string' || apiKey.trim().length === 0) {
@@ -237,32 +232,39 @@ function parseSetProviderAndModels(raw: unknown): SetProviderAndModelsInput {
  */
 async function runSetProviderAndModels(input: SetProviderAndModelsInput): Promise<OnboardingState> {
   const ciphertext = encryptSecret(input.apiKey);
-  const nextBaseUrls = { ...(cachedConfig?.baseUrls ?? {}) };
-  if (input.baseUrl !== undefined) {
-    nextBaseUrls[input.provider] = { baseUrl: input.baseUrl };
-  } else {
-    delete nextBaseUrls[input.provider];
-  }
+  const nextProviders: Record<string, ProviderEntry> = { ...(cachedConfig?.providers ?? {}) };
+  const existing = nextProviders[input.provider];
+  const builtin = BUILTIN_PROVIDERS[input.provider as SupportedOnboardingProvider];
+  const seed: ProviderEntry =
+    existing ??
+    builtin ?? {
+      id: input.provider,
+      name: input.provider,
+      builtin: false,
+      wire: 'openai-chat',
+      baseUrl: input.baseUrl ?? 'https://api.openai.com/v1',
+      defaultModel: input.modelPrimary,
+    };
+  nextProviders[input.provider] = {
+    ...seed,
+    baseUrl: input.baseUrl ?? seed.baseUrl,
+    defaultModel: input.modelPrimary || seed.defaultModel,
+  };
   const nextSecrets = {
     ...(cachedConfig?.secrets ?? {}),
     [input.provider]: { ciphertext },
   };
   const activate = input.setAsActive || cachedConfig === null;
-  const next: Config = activate
-    ? {
-        version: 2,
-        provider: input.provider,
-        modelPrimary: input.modelPrimary,
-        secrets: nextSecrets,
-        baseUrls: nextBaseUrls,
-      }
-    : {
-        version: 2,
-        provider: cachedConfig?.provider ?? input.provider,
-        modelPrimary: cachedConfig?.modelPrimary ?? input.modelPrimary,
-        secrets: nextSecrets,
-        baseUrls: nextBaseUrls,
-      };
+  const nextActiveProvider = activate ? input.provider : (cachedConfig?.activeProvider ?? input.provider);
+  const nextActiveModel = activate ? input.modelPrimary : (cachedConfig?.activeModel ?? input.modelPrimary);
+  const next: Config = hydrateConfig({
+    version: 3,
+    activeProvider: nextActiveProvider,
+    activeModel: nextActiveModel,
+    secrets: nextSecrets,
+    providers: nextProviders,
+    ...(cachedConfig?.designSystem !== undefined ? { designSystem: cachedConfig.designSystem } : {}),
+  });
   await writeConfig(next);
   cachedConfig = next;
   configLoaded = true;
@@ -281,38 +283,45 @@ async function runAddProvider(raw: unknown): Promise<ProviderRow[]> {
 }
 
 async function runDeleteProvider(raw: unknown): Promise<ProviderRow[]> {
-  if (typeof raw !== 'string' || !isSupportedOnboardingProvider(raw)) {
+  if (typeof raw !== 'string') {
     throw new CodesignError('delete-provider expects a provider string', 'IPC_BAD_INPUT');
   }
   const cfg = getCachedConfig();
   if (cfg === null) return [];
   const nextSecrets = { ...cfg.secrets };
   delete nextSecrets[raw];
-  const nextBaseUrls = { ...(cfg.baseUrls ?? {}) };
-  delete nextBaseUrls[raw];
+  const nextProviders: Record<string, ProviderEntry> = { ...cfg.providers };
+  // Custom providers are fully removed from the providers map. Builtins stay
+  // (so the user can re-add a key without losing wire/baseUrl defaults) but
+  // their secret is cleared above.
+  if (nextProviders[raw]?.builtin !== true) {
+    delete nextProviders[raw];
+  }
 
   const { nextActive, modelPrimary } = computeDeleteProviderResult(cfg, raw);
 
   if (nextActive === null) {
-    const emptyNext: Config = {
-      version: 2,
-      provider: cfg.provider,
-      modelPrimary: '',
+    const emptyNext: Config = hydrateConfig({
+      version: 3,
+      activeProvider: cfg.activeProvider,
+      activeModel: '',
       secrets: {},
-      baseUrls: {},
-    };
+      providers: nextProviders,
+      ...(cfg.designSystem !== undefined ? { designSystem: cfg.designSystem } : {}),
+    });
     await writeConfig(emptyNext);
     cachedConfig = emptyNext;
     return toProviderRows(cachedConfig, decryptSecret);
   }
 
-  const next: Config = {
-    version: 2,
-    provider: nextActive,
-    modelPrimary,
+  const next: Config = hydrateConfig({
+    version: 3,
+    activeProvider: nextActive,
+    activeModel: modelPrimary,
     secrets: nextSecrets,
-    baseUrls: nextBaseUrls,
-  };
+    providers: nextProviders,
+    ...(cfg.designSystem !== undefined ? { designSystem: cfg.designSystem } : {}),
+  });
   await writeConfig(next);
   cachedConfig = next;
   return toProviderRows(cachedConfig, decryptSecret);
@@ -325,8 +334,8 @@ async function runSetActiveProvider(raw: unknown): Promise<OnboardingState> {
   const r = raw as Record<string, unknown>;
   const provider = r['provider'];
   const modelPrimary = r['modelPrimary'];
-  if (typeof provider !== 'string' || !isSupportedOnboardingProvider(provider)) {
-    throw new CodesignError('provider must be a supported provider string', 'IPC_BAD_INPUT');
+  if (typeof provider !== 'string' || provider.length === 0) {
+    throw new CodesignError('provider must be a non-empty string', 'IPC_BAD_INPUT');
   }
   if (typeof modelPrimary !== 'string' || modelPrimary.trim().length === 0) {
     throw new CodesignError('modelPrimary must be a non-empty string', 'IPC_BAD_INPUT');
@@ -336,13 +345,14 @@ async function runSetActiveProvider(raw: unknown): Promise<OnboardingState> {
     throw new CodesignError('No configuration found', 'CONFIG_MISSING');
   }
   assertProviderHasStoredSecret(cfg, provider);
-  const next: Config = {
-    ...cfg,
-    version: 2,
-    provider,
-    modelPrimary,
-  };
-  next.modelFast = undefined;
+  const next: Config = hydrateConfig({
+    version: 3,
+    activeProvider: provider,
+    activeModel: modelPrimary,
+    secrets: cfg.secrets,
+    providers: cfg.providers,
+    ...(cfg.designSystem !== undefined ? { designSystem: cfg.designSystem } : {}),
+  });
   await writeConfig(next);
   cachedConfig = next;
   return toState(cachedConfig);
@@ -366,10 +376,14 @@ async function runResetOnboarding(): Promise<void> {
   const cfg = getCachedConfig();
   if (cfg === null) return;
   // Clear secrets so onboarding flow triggers again on next load.
-  const next: Config = {
-    ...cfg,
+  const next: Config = hydrateConfig({
+    version: 3,
+    activeProvider: cfg.activeProvider,
+    activeModel: cfg.activeModel,
     secrets: {},
-  };
+    providers: cfg.providers,
+    ...(cfg.designSystem !== undefined ? { designSystem: cfg.designSystem } : {}),
+  });
   await writeConfig(next);
   cachedConfig = next;
 }

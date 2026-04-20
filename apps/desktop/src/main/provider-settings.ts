@@ -1,17 +1,22 @@
 import {
+  BUILTIN_PROVIDERS,
   CodesignError,
   type Config,
   type ModelRef,
   PROVIDER_SHORTLIST,
-  type SupportedOnboardingProvider,
+  type ProviderEntry,
+  type WireApi,
   isSupportedOnboardingProvider,
 } from '@open-codesign/shared';
 
 export interface ProviderRow {
-  provider: SupportedOnboardingProvider;
+  provider: string;
   maskedKey: string;
   baseUrl: string | null;
   isActive: boolean;
+  label: string;
+  builtin: boolean;
+  wire: WireApi;
   error?: 'decryption_failed' | string;
 }
 
@@ -25,37 +30,35 @@ export function maskKey(plain: string): string {
 export function getAddProviderDefaults(
   cfg: Config | null,
   input: {
-    provider: SupportedOnboardingProvider;
+    provider: string;
     modelPrimary: string;
   },
 ): {
-  activeProvider: SupportedOnboardingProvider;
+  activeProvider: string;
   modelPrimary: string;
 } {
-  if (
-    cfg === null ||
-    !isSupportedOnboardingProvider(cfg.provider) ||
-    cfg.secrets[cfg.provider] === undefined
-  ) {
+  if (cfg === null || cfg.secrets[cfg.activeProvider] === undefined) {
     return {
       activeProvider: input.provider,
       modelPrimary: input.modelPrimary,
     };
   }
-  const activeProvider: SupportedOnboardingProvider = cfg.provider;
-
   return {
-    activeProvider,
-    modelPrimary: cfg.modelPrimary,
+    activeProvider: cfg.activeProvider,
+    modelPrimary: cfg.activeModel,
   };
 }
 
-export function assertProviderHasStoredSecret(
-  cfg: Config,
-  provider: SupportedOnboardingProvider,
-): void {
+export function assertProviderHasStoredSecret(cfg: Config, provider: string): void {
   if (cfg.secrets[provider] !== undefined) return;
   throw new CodesignError(`No API key stored for provider "${provider}".`, 'PROVIDER_KEY_MISSING');
+}
+
+function resolveEntryFor(cfg: Config, id: string): ProviderEntry | null {
+  const stored = cfg.providers[id];
+  if (stored !== undefined) return stored;
+  if (isSupportedOnboardingProvider(id)) return { ...BUILTIN_PROVIDERS[id] };
+  return null;
 }
 
 export function toProviderRows(
@@ -66,8 +69,8 @@ export function toProviderRows(
 
   const rows: ProviderRow[] = [];
   for (const [provider, ref] of Object.entries(cfg.secrets)) {
-    if (!isSupportedOnboardingProvider(provider) || ref === undefined) continue;
-    const supportedProvider: SupportedOnboardingProvider = provider;
+    if (ref === undefined) continue;
+    const entry = resolveEntryFor(cfg, provider);
 
     let maskedKey: string;
     let rowError: ProviderRow['error'];
@@ -75,16 +78,24 @@ export function toProviderRows(
       const plain = decrypt(ref.ciphertext);
       maskedKey = maskKey(plain);
     } catch {
-      // Surface decryption failure to the UI instead of silently masking or hard-crashing.
       maskedKey = '';
       rowError = 'decryption_failed';
     }
 
+    const label =
+      entry?.name ??
+      (isSupportedOnboardingProvider(provider)
+        ? PROVIDER_SHORTLIST[provider].label
+        : provider);
+
     rows.push({
-      provider: supportedProvider,
+      provider,
       maskedKey,
-      baseUrl: cfg.baseUrls?.[supportedProvider]?.baseUrl ?? null,
-      isActive: cfg.provider === supportedProvider,
+      baseUrl: entry?.baseUrl ?? null,
+      isActive: cfg.activeProvider === provider,
+      label,
+      builtin: entry?.builtin ?? isSupportedOnboardingProvider(provider),
+      wire: entry?.wire ?? 'openai-chat',
       ...(rowError !== undefined ? { error: rowError } : {}),
     });
   }
@@ -94,59 +105,51 @@ export function toProviderRows(
 
 export interface DeleteProviderResult {
   /** null means tombstone: all providers removed, onboarding should re-run. */
-  nextActive: SupportedOnboardingProvider | null;
+  nextActive: string | null;
   modelPrimary: string;
 }
 
 /**
  * Pure helper: given the current config and the provider to remove, computes
  * what the next active provider and model values should be.
- * Extracted for unit-testability without Electron IPC.
  */
 export function computeDeleteProviderResult(
   cfg: Config,
-  toDelete: SupportedOnboardingProvider,
+  toDelete: string,
 ): DeleteProviderResult {
-  const remaining = Object.keys(cfg.secrets)
-    .filter((p) => p !== toDelete)
-    .filter(isSupportedOnboardingProvider);
+  const remaining = Object.keys(cfg.secrets).filter((p) => p !== toDelete);
 
   if (remaining.length === 0) {
     return { nextActive: null, modelPrimary: '' };
   }
 
-  const keepCurrent = cfg.provider !== toDelete && isSupportedOnboardingProvider(cfg.provider);
-  const nextActive: SupportedOnboardingProvider = keepCurrent
-    ? (cfg.provider as SupportedOnboardingProvider)
-    : (remaining[0] as SupportedOnboardingProvider);
+  const keepCurrent = cfg.activeProvider !== toDelete;
+  const nextActive = keepCurrent ? cfg.activeProvider : (remaining[0] as string);
 
-  if (cfg.provider === toDelete) {
-    const defaults = PROVIDER_SHORTLIST[nextActive];
+  if (cfg.activeProvider === toDelete) {
+    const entry = resolveEntryFor(cfg, nextActive);
+    const fallbackModel = isSupportedOnboardingProvider(nextActive)
+      ? PROVIDER_SHORTLIST[nextActive].defaultPrimary
+      : (entry?.defaultModel ?? '');
     return {
       nextActive,
-      modelPrimary: defaults.defaultPrimary,
+      modelPrimary: fallbackModel,
     };
   }
 
-  return { nextActive, modelPrimary: cfg.modelPrimary };
+  return { nextActive, modelPrimary: cfg.activeModel };
 }
 
 /**
  * Result of resolving which provider/model to call against, given the canonical
  * cached config and the renderer's hint payload.
- *
- * Why this exists: the renderer keeps its own copy of `cfg.provider` /
- * `cfg.modelPrimary` in the Zustand store and forwards them in
- * `GeneratePayloadV1.model`. If that copy drifts (settings IPC succeeds in
- * main but the store mutation is missed, or a second window is open), the
- * generate handler would silently call a different provider than what the
- * Settings UI shows as Active. We treat the renderer payload as a hint and
- * always snap back to the canonical active provider in `cachedConfig`, which
- * is the SAME source `toProviderRows` uses to render the Active badge.
  */
 export interface ActiveModelResolution {
   model: ModelRef;
   baseUrl: string | null;
+  wire: WireApi;
+  httpHeaders: Record<string, string> | undefined;
+  queryParams: Record<string, string> | undefined;
   /** True when the renderer-supplied hint provider didn't match the canonical active. */
   overridden: boolean;
 }
@@ -155,25 +158,28 @@ export function resolveActiveModel(
   cfg: Config,
   hint: { provider: string; modelId: string },
 ): ActiveModelResolution {
-  if (!isSupportedOnboardingProvider(cfg.provider)) {
+  const activeId = cfg.activeProvider;
+  if (cfg.secrets[activeId] === undefined) {
     throw new CodesignError(
-      `Active provider "${cfg.provider}" is not in the onboarding shortlist.`,
-      'PROVIDER_NOT_SUPPORTED',
-    );
-  }
-  if (cfg.secrets[cfg.provider] === undefined) {
-    throw new CodesignError(
-      `No API key stored for active provider "${cfg.provider}". Re-run onboarding to add one.`,
+      `No API key stored for active provider "${activeId}". Re-run onboarding to add one.`,
       'PROVIDER_KEY_MISSING',
     );
   }
-  const overridden = cfg.provider !== hint.provider;
-  // When the hint's provider doesn't match active, snap to the active
-  // provider's primary model to keep the call coherent.
-  const modelId = overridden ? cfg.modelPrimary : hint.modelId;
+  const entry = resolveEntryFor(cfg, activeId);
+  if (entry === null) {
+    throw new CodesignError(
+      `Active provider "${activeId}" has no provider entry on disk.`,
+      'PROVIDER_NOT_SUPPORTED',
+    );
+  }
+  const overridden = activeId !== hint.provider;
+  const modelId = overridden ? cfg.activeModel : hint.modelId;
   return {
-    model: { provider: cfg.provider, modelId },
-    baseUrl: cfg.baseUrls?.[cfg.provider]?.baseUrl ?? null,
+    model: { provider: activeId, modelId },
+    baseUrl: entry.baseUrl,
+    wire: entry.wire,
+    httpHeaders: entry.httpHeaders,
+    queryParams: entry.queryParams,
     overridden,
   };
 }

@@ -16,7 +16,10 @@ export const ProviderId = z.enum([
 export type ProviderId = z.infer<typeof ProviderId>;
 
 export const ModelRef = z.object({
-  provider: ProviderId,
+  // v3: providers may be custom ids (`custom-deepseek`, etc.), not just the
+  // legacy enum. Keep ProviderId as a documented convenience but let the wire
+  // do the dispatch downstream.
+  provider: z.string().min(1),
   modelId: z.string(),
 });
 export type ModelRef = z.infer<typeof ModelRef>;
@@ -209,19 +212,31 @@ export class CodesignError extends Error {
 }
 
 export {
+  BUILTIN_PROVIDERS,
   ConfigSchema,
+  ConfigV3Schema,
   PROVIDER_SHORTLIST,
+  ProviderEntrySchema,
   SUPPORTED_ONBOARDING_PROVIDERS,
   SecretRef,
   STORED_DESIGN_SYSTEM_SCHEMA_VERSION,
   StoredDesignSystem,
+  WireApiSchema,
+  detectWireFromBaseUrl,
+  hydrateConfig,
   isSupportedOnboardingProvider,
+  migrateLegacyToV3,
+  parseConfigFlexible,
+  toPersistedV3,
 } from './config';
 export type {
   Config,
+  ConfigV3,
   OnboardingState,
+  ProviderEntry,
   ProviderShortlist,
   SupportedOnboardingProvider,
+  WireApi,
 } from './config';
 
 export {

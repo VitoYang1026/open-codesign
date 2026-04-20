@@ -1,4 +1,4 @@
-import { CodesignError, type Config } from '@open-codesign/shared';
+import { CodesignError, type Config, hydrateConfig } from '@open-codesign/shared';
 import { describe, expect, it } from 'vitest';
 import {
   assertProviderHasStoredSecret,
@@ -8,15 +8,50 @@ import {
   toProviderRows,
 } from './provider-settings';
 
+function makeCfg(input: {
+  provider: string;
+  modelPrimary: string;
+  secrets?: Record<string, { ciphertext: string }>;
+  baseUrls?: Record<string, string>;
+}): Config {
+  const providers: Record<string, import('@open-codesign/shared').ProviderEntry> = {
+    anthropic: {
+      id: 'anthropic',
+      name: 'Anthropic Claude',
+      builtin: true,
+      wire: 'anthropic',
+      baseUrl: input.baseUrls?.['anthropic'] ?? 'https://api.anthropic.com',
+      defaultModel: 'claude-sonnet-4-6',
+    },
+    openai: {
+      id: 'openai',
+      name: 'OpenAI',
+      builtin: true,
+      wire: 'openai-chat',
+      baseUrl: input.baseUrls?.['openai'] ?? 'https://api.openai.com/v1',
+      defaultModel: 'gpt-4o',
+    },
+    openrouter: {
+      id: 'openrouter',
+      name: 'OpenRouter',
+      builtin: true,
+      wire: 'openai-chat',
+      baseUrl: input.baseUrls?.['openrouter'] ?? 'https://openrouter.ai/api/v1',
+      defaultModel: 'anthropic/claude-sonnet-4.6',
+    },
+  };
+  return hydrateConfig({
+    version: 3,
+    activeProvider: input.provider,
+    activeModel: input.modelPrimary,
+    secrets: input.secrets ?? {},
+    providers,
+  });
+}
+
 describe('getAddProviderDefaults', () => {
   it('activates the newly added provider when the cached active provider has no saved secret', () => {
-    const cfg: Config = {
-      version: 2,
-      provider: 'openai',
-      modelPrimary: 'gpt-4o',
-      secrets: {},
-      baseUrls: {},
-    };
+    const cfg = makeCfg({ provider: 'openai', modelPrimary: 'gpt-4o' });
 
     const defaults = getAddProviderDefaults(cfg, {
       provider: 'anthropic',
@@ -32,17 +67,12 @@ describe('getAddProviderDefaults', () => {
 
 describe('toProviderRows', () => {
   it('returns a row with error:decryption_failed and empty maskedKey when decrypt throws', () => {
-    const cfg: Config = {
-      version: 2,
+    const cfg = makeCfg({
       provider: 'openai',
       modelPrimary: 'gpt-4o',
-      secrets: {
-        openai: { ciphertext: 'bad-ciphertext' },
-      },
-      baseUrls: {},
-    };
+      secrets: { openai: { ciphertext: 'bad-ciphertext' } },
+    });
 
-    // Should NOT throw — decryption failure is now soft-handled.
     const rows = toProviderRows(cfg, () => {
       throw new Error('safeStorage unavailable');
     });
@@ -54,15 +84,11 @@ describe('toProviderRows', () => {
   });
 
   it('returns a normal masked row when decrypt succeeds', () => {
-    const cfg: Config = {
-      version: 2,
+    const cfg = makeCfg({
       provider: 'anthropic',
       modelPrimary: 'claude-sonnet-4-6',
-      secrets: {
-        anthropic: { ciphertext: 'enc' },
-      },
-      baseUrls: {},
-    };
+      secrets: { anthropic: { ciphertext: 'enc' } },
+    });
 
     const rows = toProviderRows(cfg, () => 'sk-ant-api03-abcdefghijklmnop');
 
@@ -75,15 +101,11 @@ describe('toProviderRows', () => {
 
 describe('assertProviderHasStoredSecret', () => {
   it('throws when activating a provider without a stored API key', () => {
-    const cfg: Config = {
-      version: 2,
+    const cfg = makeCfg({
       provider: 'openai',
       modelPrimary: 'gpt-4o',
-      secrets: {
-        openai: { ciphertext: 'ciphertext' },
-      },
-      baseUrls: {},
-    };
+      secrets: { openai: { ciphertext: 'ciphertext' } },
+    });
 
     expect(() => assertProviderHasStoredSecret(cfg, 'anthropic')).toThrow(CodesignError);
   });
@@ -91,16 +113,14 @@ describe('assertProviderHasStoredSecret', () => {
 
 describe('computeDeleteProviderResult', () => {
   it('switches to the next provider default models when the active provider is deleted', () => {
-    const cfg: Config = {
-      version: 2,
+    const cfg = makeCfg({
       provider: 'anthropic',
       modelPrimary: 'claude-sonnet-4-6',
       secrets: {
         anthropic: { ciphertext: 'enc-ant' },
         openai: { ciphertext: 'enc-oai' },
       },
-      baseUrls: {},
-    };
+    });
 
     const result = computeDeleteProviderResult(cfg, 'anthropic');
 
@@ -109,16 +129,14 @@ describe('computeDeleteProviderResult', () => {
   });
 
   it('keeps existing models when a non-active provider is deleted', () => {
-    const cfg: Config = {
-      version: 2,
+    const cfg = makeCfg({
       provider: 'anthropic',
       modelPrimary: 'claude-sonnet-4-6',
       secrets: {
         anthropic: { ciphertext: 'enc-ant' },
         openai: { ciphertext: 'enc-oai' },
       },
-      baseUrls: {},
-    };
+    });
 
     const result = computeDeleteProviderResult(cfg, 'openai');
 
@@ -127,15 +145,11 @@ describe('computeDeleteProviderResult', () => {
   });
 
   it('returns nextActive null and empty models when the last provider is deleted', () => {
-    const cfg: Config = {
-      version: 2,
+    const cfg = makeCfg({
       provider: 'openai',
       modelPrimary: 'gpt-4o',
-      secrets: {
-        openai: { ciphertext: 'enc-oai' },
-      },
-      baseUrls: {},
-    };
+      secrets: { openai: { ciphertext: 'enc-oai' } },
+    });
 
     const result = computeDeleteProviderResult(cfg, 'openai');
 
@@ -145,18 +159,15 @@ describe('computeDeleteProviderResult', () => {
 });
 
 describe('resolveActiveModel', () => {
-  const baseCfg: Config = {
-    version: 2,
+  const baseCfg = makeCfg({
     provider: 'openrouter',
     modelPrimary: 'anthropic/claude-sonnet-4.6',
     secrets: {
       openai: { ciphertext: 'enc-oai' },
       openrouter: { ciphertext: 'enc-or' },
     },
-    baseUrls: {
-      openai: { baseUrl: 'https://api.duckcoding.ai/v1' },
-    },
-  };
+    baseUrls: { openai: 'https://api.duckcoding.ai/v1' },
+  });
 
   it('returns the canonical active provider when the hint already matches', () => {
     const result = resolveActiveModel(baseCfg, {
@@ -167,16 +178,13 @@ describe('resolveActiveModel', () => {
     expect(result.overridden).toBe(false);
     expect(result.model).toEqual({
       provider: 'openrouter',
-      // Hint modelId is preserved so the renderer can pick fast vs primary.
       modelId: 'anthropic/claude-haiku-3',
     });
-    expect(result.baseUrl).toBeNull();
+    // openrouter default base url is the builtin one
+    expect(result.baseUrl).toBe('https://openrouter.ai/api/v1');
   });
 
   it('snaps a stale hint back to the canonical active provider and modelPrimary', () => {
-    // Reproduces the reported bug: Settings UI shows OpenRouter Active, but the
-    // renderer's stale store sends openai + duckcoding-style modelId. The
-    // resolver must override so the actual call lands on openrouter.
     const result = resolveActiveModel(baseCfg, {
       provider: 'openai',
       modelId: 'gpt-4o',
@@ -187,11 +195,18 @@ describe('resolveActiveModel', () => {
       provider: 'openrouter',
       modelId: 'anthropic/claude-sonnet-4.6',
     });
-    expect(result.baseUrl).toBeNull();
+    expect(result.baseUrl).toBe('https://openrouter.ai/api/v1');
   });
 
   it('threads through the per-provider baseUrl for the canonical active', () => {
-    const cfg: Config = { ...baseCfg, provider: 'openai', modelPrimary: 'gpt-4o' };
+    const cfg = makeCfg({
+      provider: 'openai',
+      modelPrimary: 'gpt-4o',
+      secrets: {
+        openai: { ciphertext: 'enc-oai' },
+      },
+      baseUrls: { openai: 'https://api.duckcoding.ai/v1' },
+    });
     const result = resolveActiveModel(cfg, { provider: 'openai', modelId: 'gpt-4o' });
 
     expect(result.overridden).toBe(false);
@@ -199,16 +214,18 @@ describe('resolveActiveModel', () => {
   });
 
   it('ignores stale hint baseUrl entry and returns active provider baseUrl on override', () => {
-    // Reproduces the Codex finding: hint says {openai, duckcoding}, active is
-    // openrouter. The resolver must report openrouter's baseUrl (null here) so
-    // the IPC handler does not route the openrouter key to duckcoding.
-    const cfg: Config = {
-      ...baseCfg,
-      baseUrls: {
-        openai: { baseUrl: 'https://api.duckcoding.ai/v1' },
-        openrouter: { baseUrl: 'https://openrouter.ai/api/v1' },
+    const cfg = makeCfg({
+      provider: 'openrouter',
+      modelPrimary: 'anthropic/claude-sonnet-4.6',
+      secrets: {
+        openai: { ciphertext: 'enc-oai' },
+        openrouter: { ciphertext: 'enc-or' },
       },
-    };
+      baseUrls: {
+        openai: 'https://api.duckcoding.ai/v1',
+        openrouter: 'https://openrouter.ai/api/v1',
+      },
+    });
     const result = resolveActiveModel(cfg, { provider: 'openai', modelId: 'gpt-4o' });
 
     expect(result.overridden).toBe(true);
@@ -217,25 +234,23 @@ describe('resolveActiveModel', () => {
   });
 
   it('returns canonical openrouter baseUrl when stale hint says openai+duckcoding', () => {
-    // Codex Major scenario: renderer payload claims openai with a duckcoding
-    // baseUrl, but the canonical active provider in cached config is
-    // openrouter. The resolver must surface openrouter's baseUrl (here null —
-    // openrouter has no override) so the IPC handler does not forward the
-    // stale duckcoding endpoint.
     const result = resolveActiveModel(baseCfg, { provider: 'openai', modelId: 'gpt-4o' });
 
     expect(result.overridden).toBe(true);
     expect(result.model.provider).toBe('openrouter');
-    expect(result.baseUrl).toBeNull();
+    expect(result.baseUrl).toBe('https://openrouter.ai/api/v1');
     expect(result.baseUrl).not.toBe('https://api.duckcoding.ai/v1');
   });
 
   it('throws PROVIDER_KEY_MISSING when the active provider has no stored secret', () => {
-    const cfg: Config = {
-      ...baseCfg,
+    const cfg = makeCfg({
       provider: 'anthropic',
       modelPrimary: 'claude-sonnet-4-6',
-    };
+      secrets: {
+        openai: { ciphertext: 'enc-oai' },
+        openrouter: { ciphertext: 'enc-or' },
+      },
+    });
     expect(() =>
       resolveActiveModel(cfg, { provider: 'anthropic', modelId: 'claude-sonnet-4-6' }),
     ).toThrowError(CodesignError);
