@@ -111,11 +111,11 @@ open-codesign addresses all three: BYOK eliminates lock-in, multi-model support 
 
 ## Roadmap
 
-- **v0.1 (shipped, April 2026)** — installers, multi-provider BYOK, 15 demos, 12 skills, HTML/JSX/PDF/PPTX/ZIP/Markdown export, inline comment, sliders, preview pool.
-- **v0.2** — cost transparency, version snapshots with diff + rollback, three-style parallel exploration.
-- **v0.3** — codebase → design system token extraction.
+- **v0.1 (shipped, April 2026)** — unsigned installers, multi-provider BYOK, 15 demos, 12 skills, HTML/JSX/PDF/PPTX/ZIP/Markdown export, inline comment, sliders, preview pool, per-generation token counter.
+- **v0.2** — pre-generation token estimate + weekly spend budget, version snapshots with diff + rollback, three-style parallel exploration.
+- **v0.3** — codebase → design system token extraction (Tailwind / CSS vars / W3C DTCG extractors are implemented library-side; v0.3 wires them to the desktop UI).
 - **v0.4** — on-demand Playwright web capture, handoff bundle to open-cowork, external skill packs.
-- **v0.5** — Apple Developer ID + Windows Authenticode code-signing, opt-in auto-update, Homebrew Cask + winget + Scoop manifests.
+- **v0.5** — Apple Developer ID + Windows Authenticode code-signing, opt-in auto-update, Homebrew Cask + winget + Scoop manifests verified.
 - **v1.0** — onboarding ≤ 3 steps, stable public API for `packages/core` and `packages/providers`.
 
 ## Community and contribution

@@ -129,8 +129,9 @@ scoop install opencowork/open-codesign
 - **浅色 + 深色主题**，**EN + 简体中文** 界面，支持实时切换
 - **五种导出格式** — HTML（内联 CSS）、PDF（本机 Chrome）、PPTX、ZIP、Markdown
 - **生成取消** — 随时打断流式输出，之前的轮次不丢失
+- **每次生成的 token 计数** — Sidebar 直接显示每轮消耗的 token 数
 - **设置页面四个 tab** — Models（provider + key）、Appearance（主题 / 语言）、Storage（配置与数据路径）、Advanced（更新通道）
-- **GitHub Release 流水线** — 签名 DMG（macOS）、EXE（Windows）、AppImage（Linux）
+- **GitHub Release 流水线** — 未签名 DMG（macOS）、EXE（Windows）、AppImage（Linux）。代码签名 + 可选自动更新将在 v0.5 引入。
 
 ---
 
@@ -153,11 +154,11 @@ scoop install opencowork/open-codesign
 | PDF 导出（本机 Chrome） | ✅ 已上线 |
 | PPTX 导出 | ✅ 已上线 |
 | ZIP / Markdown 导出 | ✅ 已上线 |
-| 成本透明（token 估算 + 每周花费） | 🔜 即将推出 |
+| 成本透明（生成前 token 估算 + 周预算，每次生成 token 数已上线） | 🔜 即将推出 |
 | 版本快照 + 并排 diff | 🔜 即将推出 |
 | 代码库 → 设计系统（token 提取） | 🔜 即将推出 |
 | 三风格并发探索 | 🔜 即将推出 |
-| 代码签名（Apple ID + Authenticode）| 🔜 Stage 2 |
+| 代码签名（Apple ID + Authenticode）+ 可选自动更新 | 🔜 v0.5 |
 | Figma 图层导出 | 🔜 1.0 版本后 |
 
 ---

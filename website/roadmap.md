@@ -24,11 +24,11 @@ First public release, installers for macOS (DMG), Windows (EXE), and Linux (AppI
 
 ## v0.2 — Cost + versions (next)
 
-Cost transparency (token estimate before each generation, weekly spend in the toolbar), version snapshots with side-by-side diff and rollback, three-style parallel exploration.
+Pre-generation token estimate and weekly spend budget (per-generation token counter already ships in the sidebar), version snapshots with side-by-side diff and rollback, three-style parallel exploration.
 
 ## v0.3 — Codebase → design system
 
-Point at a local repo; we extract Tailwind tokens, CSS variables, and W3C design tokens, and every subsequent generation respects them.
+Point at a local repo; we extract Tailwind tokens, CSS variables, and W3C design tokens, and every subsequent generation respects them. The extractors (`tailwindExtractor`, `cssVarExtractor`, `dtcgImporter`) are already implemented library-side with full test coverage; v0.3 wires them to the desktop UI.
 
 ## v0.4 — Web capture + handoff
 

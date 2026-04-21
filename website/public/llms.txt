@@ -44,17 +44,18 @@
 - Light + dark themes; EN + 简体中文 UI with live toggle
 - Five export formats: HTML (inlined CSS), PDF (local Chrome), PPTX, ZIP, Markdown
 - Generation cancellation mid-stream
+- Per-generation token counter in the sidebar
 - Four-tab Settings: Models, Appearance, Storage, Advanced
-- Release pipeline with signed DMG / EXE / AppImage
+- Release pipeline with unsigned DMG / EXE / AppImage (code-signing lands in v0.5)
 
 ## Coming soon (v0.2 — v0.5)
 
-- Cost transparency (token estimate before generation, weekly spend in toolbar)
+- Cost transparency — pre-generation token estimate + weekly spend budget (per-generation token count already shipped)
 - Version snapshots + side-by-side diff + rollback
 - Three-style parallel exploration
 - Codebase → design system (extract Tailwind tokens, CSS variables, W3C design tokens from a local repo)
 - Web capture via Playwright (on-demand)
-- Apple Developer ID notarization + Windows Authenticode code-signing
+- Apple Developer ID notarization + Windows Authenticode code-signing + opt-in auto-update (v0.5)
 - Homebrew Cask + winget + Scoop manifests verified
 
 ## Documentation

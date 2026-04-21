@@ -129,8 +129,9 @@ Add a `SKILL.md` to any project to teach the model your own taste.
 - **Light + dark themes**, **EN + 简体中文 UI** with live toggle
 - **Five export formats** — HTML (inlined CSS), PDF (local Chrome), PPTX, ZIP, Markdown
 - **Generation cancellation** — stop mid-stream without losing prior turns
+- **Per-generation token counter** — see exactly how many tokens each run cost, right in the sidebar
 - **Settings with four tabs** — Models (providers + keys), Appearance (theme/language), Storage (config + data paths), Advanced (update channel)
-- **GitHub Release pipeline** — signed DMG (macOS), EXE (Windows), AppImage (Linux)
+- **GitHub Release pipeline** — unsigned DMG (macOS), EXE (Windows), AppImage (Linux). Code-signing lands in v0.5 along with opt-in auto-update.
 
 ---
 
@@ -153,11 +154,11 @@ Add a `SKILL.md` to any project to teach the model your own taste.
 | PDF export (local Chrome) | ✅ Shipped |
 | PPTX export | ✅ Shipped |
 | ZIP / Markdown export | ✅ Shipped |
-| Cost transparency (token estimate + weekly spend) | 🔜 Coming |
+| Cost transparency — pre-generation estimate + weekly budget (per-generation token count already shipped) | 🔜 Coming |
 | Version snapshots + side-by-side diff | 🔜 Coming |
 | Codebase → design system (token extraction) | 🔜 Coming |
 | Three-style parallel exploration | 🔜 Coming |
-| Code-signing (Apple ID + Authenticode) | 🔜 Stage 2 |
+| Code-signing (Apple ID + Authenticode) + opt-in auto-update | 🔜 v0.5 |
 | Figma layer export | 🔜 Post-1.0 |
 
 ---

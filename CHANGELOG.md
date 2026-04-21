@@ -32,7 +32,7 @@ Post-v0.1.0 maintenance release. No breaking changes. Focused on runtime correct
 
 ## [0.1.0] — 2026-04-18
 
-First public release. Electron desktop app, signed GitHub releases for macOS (DMG), Windows (EXE), and Linux (AppImage).
+First public release. Electron desktop app, GitHub releases for macOS (DMG), Windows (EXE), and Linux (AppImage). Installers are unsigned in v0.1 — code-signing + opt-in auto-update land in v0.5.
 
 ### Added
 
