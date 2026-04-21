@@ -55,16 +55,31 @@ export function makeRuntimeVerifier(): DoneRuntimeVerifier {
     type ConsoleMessageEvent = {
       level: 'verbose' | 'info' | 'warning' | 'error' | number;
       message: string;
+      // Electron < 35 emits `line` (positional), 35+ emits an Event object
+      // with `lineNumber`. Accept both so the listener survives the signature
+      // change without a runtime branch at every call site.
       line?: number;
+      lineNumber?: number;
       sourceId?: string;
     };
 
-    const onConsole = (
-      _event: unknown,
-      level: ConsoleMessageEvent['level'],
-      message: string,
-      line?: number,
-    ) => {
+    const onConsole = (...args: unknown[]) => {
+      // Electron 35+ emits a single Event-like object; older majors emit
+      // positional (event, level, message, line, sourceId). Detect by
+      // arity — a single object argument means the new shape.
+      let level: ConsoleMessageEvent['level'];
+      let message: string;
+      let line: number | undefined;
+      if (args.length === 1 && typeof args[0] === 'object' && args[0] !== null) {
+        const e = args[0] as ConsoleMessageEvent;
+        level = e.level;
+        message = e.message;
+        line = e.lineNumber ?? e.line;
+      } else {
+        level = args[1] as ConsoleMessageEvent['level'];
+        message = args[2] as string;
+        line = args[3] as number | undefined;
+      }
       // Electron <26 emits a numeric level (0-3); newer builds emit a string.
       const isError = level === 'error' || level === 3;
       const isWarning = level === 'warning' || level === 2;
