@@ -28,6 +28,14 @@ export type WireApi = z.infer<typeof WireApiSchema>;
 
 export const SecretRef = z.object({
   ciphertext: z.string().min(1),
+  /**
+   * Display-only mask like "sk-ant-***xyz9". Persisted at save time so the
+   * Settings page can render the row without calling `safeStorage.decryptString`
+   * (which on unsigned macOS builds triggers a keychain password prompt).
+   * Optional for backwards compat: older configs without a mask will be
+   * migrated on first read by decrypting once and writing the mask back.
+   */
+  mask: z.string().optional(),
 });
 export type SecretRef = z.infer<typeof SecretRef>;
 

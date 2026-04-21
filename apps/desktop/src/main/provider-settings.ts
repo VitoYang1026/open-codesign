@@ -8,6 +8,7 @@ import {
   type WireApi,
   isSupportedOnboardingProvider,
 } from '@open-codesign/shared';
+import { maskSecret } from './keychain';
 
 export interface ProviderRow {
   provider: string;
@@ -22,12 +23,11 @@ export interface ProviderRow {
   error?: 'decryption_failed' | string;
 }
 
-export function maskKey(plain: string): string {
-  if (plain.length <= 8) return '***';
-  const prefix = plain.startsWith('sk-') ? 'sk-' : plain.slice(0, 4);
-  const suffix = plain.slice(-4);
-  return `${prefix}***${suffix}`;
-}
+/**
+ * @deprecated Use `maskSecret` from `./keychain`. Re-exported for tests that
+ * still import the old name.
+ */
+export const maskKey = maskSecret;
 
 export function getAddProviderDefaults(
   cfg: Config | null,
@@ -90,12 +90,21 @@ export function toProviderRows(
     let maskedKey = '';
     let rowError: ProviderRow['error'];
     if (ref !== undefined) {
-      try {
-        const plain = decrypt(ref.ciphertext);
-        maskedKey = maskKey(plain);
-      } catch {
-        maskedKey = '';
-        rowError = 'decryption_failed';
+      // Prefer the persisted mask — avoids triggering a keychain password
+      // prompt on unsigned macOS builds just to render the Settings row.
+      // Fall back to decrypting once for legacy configs that pre-date the
+      // mask field; `migrateSecretMasks` should have rewritten them, but
+      // we stay resilient in case migration didn't complete.
+      if (ref.mask !== undefined && ref.mask.length > 0) {
+        maskedKey = ref.mask;
+      } else {
+        try {
+          const plain = decrypt(ref.ciphertext);
+          maskedKey = maskSecret(plain);
+        } catch {
+          maskedKey = '';
+          rowError = 'decryption_failed';
+        }
       }
     }
 

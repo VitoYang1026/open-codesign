@@ -59,6 +59,26 @@ vi.mock('./config', () => ({
 vi.mock('./keychain', () => ({
   encryptSecret: vi.fn((s: string) => `enc:${s}`),
   decryptSecret: vi.fn((s: string) => s.replace('enc:', '')),
+  maskSecret: vi.fn((s: string) => (s.length > 8 ? `${s.slice(0, 4)}***${s.slice(-4)}` : '***')),
+  buildSecretRef: vi.fn((s: string) => ({
+    ciphertext: `enc:${s}`,
+    mask: s.length > 8 ? `${s.slice(0, 4)}***${s.slice(-4)}` : '***',
+  })),
+  tryBuildSecretRef: vi.fn((s: string) => ({
+    ciphertext: `enc:${s}`,
+    mask: s.length > 8 ? `${s.slice(0, 4)}***${s.slice(-4)}` : '***',
+  })),
+  migrateSecretMasks: vi.fn((cfg: { secrets?: Record<string, unknown> }) => ({
+    config: cfg,
+    changed: false,
+  })),
+  ensureKeychainAvailable: vi.fn(() => {}),
+}));
+
+vi.mock('./keychain-ux', () => ({
+  prepareKeychain: vi.fn(async () => true),
+  maybeShowKeychainExplainer: vi.fn(async () => {}),
+  maybeShowKeychainUnavailableDialog: vi.fn(async () => {}),
 }));
 
 vi.mock('./storage-settings', () => ({
