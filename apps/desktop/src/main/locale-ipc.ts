@@ -16,8 +16,10 @@ import { dirname, join } from 'node:path';
 import { availableLocales, isSupportedLocale, normalizeLocale } from '@open-codesign/i18n';
 import { configDir } from './config';
 import { app, ipcMain } from './electron-runtime';
+import { getLogger } from './logger';
 
 const SCHEMA_VERSION = 1;
+const logger = getLogger('locale-ipc');
 
 function localeFile(): string {
   return join(configDir(), 'locale.json');
@@ -40,7 +42,10 @@ async function readPersisted(): Promise<string | null> {
   } catch (err) {
     const code = (err as NodeJS.ErrnoException).code;
     if (code === 'ENOENT') return null;
-    console.warn(`[locale-ipc] failed to read ${file}:`, err);
+    logger.warn('locale.read.fail', {
+      file,
+      message: err instanceof Error ? err.message : String(err),
+    });
     return null;
   }
 }

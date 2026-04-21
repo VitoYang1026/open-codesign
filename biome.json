@@ -71,5 +71,38 @@
         "useValidAnchor": "off"
       }
     }
-  }
+  },
+  "overrides": [
+    {
+      "include": [
+        "apps/desktop/src/main/**",
+        "packages/core/src/**",
+        "packages/providers/src/**",
+        "packages/exporters/src/**",
+        "packages/shared/src/**"
+      ],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noConsole": "error"
+          }
+        }
+      }
+    },
+    {
+      "include": [
+        "**/*.test.ts",
+        "**/*.test.tsx",
+        "packages/core/src/prompts/**",
+        "packages/core/src/brand/dtcgImporter.ts"
+      ],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noConsole": "off"
+          }
+        }
+      }
+    }
+  ]
 }
