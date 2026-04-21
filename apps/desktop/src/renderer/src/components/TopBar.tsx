@@ -34,7 +34,7 @@ export function TopBar() {
       }}
     >
       <div className="flex items-center gap-[var(--space-8)] min-w-0 h-full" style={noDragStyle}>
-        <Wordmark badge={t('common.preAlpha')} size="md" />
+        <Wordmark badge={`v${__APP_VERSION__}`} size="md" />
 
         {view === 'settings' ? (
           <div className="flex items-center gap-[var(--space-2)]">

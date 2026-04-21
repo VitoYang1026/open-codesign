@@ -138,7 +138,7 @@ const secondaryAssets = () => {
     <p class="install-hint">
       <strong>macOS 安装</strong>：拖到「应用程序」。双击打开若被 Gatekeeper 拦截（常见于 Sequoia 15+），终端跑一次：<br/>
       <code>xattr -cr "/Applications/Open CoDesign.app"</code><br/>
-      然后再双击就能打开。下载历史版本（文件名仍是 <code>open-codesign.app</code>）请把路径对应替换。
+      然后再双击就能打开。（0.1.x 旧 build 路径是 <code>/Applications/open-codesign.app</code>。）
     </p>
   </div>
 </template>
