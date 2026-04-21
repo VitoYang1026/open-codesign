@@ -37,6 +37,36 @@ function forward(
   }
 }
 
+function makeReplacer() {
+  const seen = new WeakSet<object>();
+  return (_key: string, v: unknown): unknown => {
+    if (typeof v === 'function') return '[fn]';
+    if (v && typeof v === 'object') {
+      if (seen.has(v as object)) return '[circular]';
+      seen.add(v as object);
+    }
+    return v;
+  };
+}
+
+function safeStringify(value: unknown): string {
+  if (typeof value === 'string') return value;
+  if (value instanceof Error) return value.message;
+  if (
+    typeof value === 'number' ||
+    typeof value === 'boolean' ||
+    value === null ||
+    value === undefined
+  ) {
+    return String(value);
+  }
+  try {
+    return JSON.stringify(value, makeReplacer());
+  } catch {
+    return '[unserializable]';
+  }
+}
+
 let bridgeInstalled = false;
 
 export function installRendererLogBridge(): void {
@@ -49,7 +79,7 @@ export function installRendererLogBridge(): void {
   console.warn = (...args: unknown[]): void => {
     originalWarn(...args);
     try {
-      forward('warn', 'console', args.map(String).join(' '));
+      forward('warn', 'console', args.map(safeStringify).join(' '));
     } catch {
       // swallow — never recurse
     }
@@ -58,7 +88,7 @@ export function installRendererLogBridge(): void {
   console.error = (...args: unknown[]): void => {
     originalError(...args);
     try {
-      forward('error', 'console', args.map(String).join(' '));
+      forward('error', 'console', args.map(safeStringify).join(' '));
     } catch {
       // swallow — never recurse
     }
