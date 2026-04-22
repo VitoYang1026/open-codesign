@@ -787,7 +787,10 @@
       "message": "Message",
       "recentlyReported": "You reported the same issue {relative}.",
       "viewPrevious": "View previous issue",
-      "continueAnyway": "Continue anyway"
+      "continueAnyway": "Continue anyway",
+      "bundleSavedTitle": "Bundle saved",
+      "bundleSavedDescription": "Saved to",
+      "revealBundle": "Show in folder"
     }
   },
   "demos": {

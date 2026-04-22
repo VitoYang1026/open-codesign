@@ -69,6 +69,7 @@ export function ReportEventDialog({ eventId, onClose }: ReportEventDialogProps) 
   const recentEvents = useCodesignStore((s) => s.recentEvents);
   const refreshDiagnosticEvents = useCodesignStore((s) => s.refreshDiagnosticEvents);
   const reportDiagnosticEvent = useCodesignStore((s) => s.reportDiagnosticEvent);
+  const pushToast = useCodesignStore((s) => s.pushToast);
 
   const [notes, setNotes] = useState('');
   const [include, setInclude] = useState<IncludeFlags>(DEFAULT_INCLUDE);
@@ -138,6 +139,17 @@ export function ReportEventDialog({ eventId, onClose }: ReportEventDialogProps) 
     setErr(null);
     try {
       const result = await reportDiagnosticEvent(buildReportInput(eventId, notes, include));
+      pushToast({
+        variant: 'info',
+        title: t('diagnostics.report.bundleSavedTitle'),
+        description: `${t('diagnostics.report.bundleSavedDescription')} ${result.bundlePath}`,
+        action: {
+          label: t('diagnostics.report.revealBundle'),
+          onClick: () => {
+            void window.codesign?.diagnostics?.showItemInFolder?.(result.bundlePath);
+          },
+        },
+      });
       if (kind === 'open') {
         await window.codesign?.openExternal?.(result.issueUrl);
         onClose();

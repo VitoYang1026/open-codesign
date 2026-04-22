@@ -786,7 +786,10 @@
       "message": "消息",
       "recentlyReported": "你在 {relative} 上报过同样的问题。",
       "viewPrevious": "查看之前的 issue",
-      "continueAnyway": "仍然继续"
+      "continueAnyway": "仍然继续",
+      "bundleSavedTitle": "诊断包已保存",
+      "bundleSavedDescription": "已保存至",
+      "revealBundle": "打开所在位置"
     }
   },
   "demos": {
