@@ -787,6 +787,7 @@
       "copySummary": "Copy summary",
       "cancel": "Cancel",
       "copied": "Copied to clipboard",
+      "generating": "Creating bundle…",
       "eventNotFound": "Event not found — it may have been pruned.",
       "loading": "Loading event…",
       "close": "Close",

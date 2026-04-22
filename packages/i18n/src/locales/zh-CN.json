@@ -786,6 +786,7 @@
       "copySummary": "复制摘要",
       "cancel": "取消",
       "copied": "已复制",
+      "generating": "正在生成诊断包…",
       "eventNotFound": "找不到该事件 — 可能已被清理。",
       "loading": "加载事件中…",
       "close": "关闭",

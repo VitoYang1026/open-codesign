@@ -324,7 +324,7 @@ export function ReportEventDialog({ eventId, onClose }: ReportEventDialogProps) 
           </div>
         ) : (
           <>
-            <pre className="text-[var(--text-xs)] font-mono bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius-md)] p-3 whitespace-pre-wrap break-words text-[var(--color-text-primary)]">
+            <pre className="text-[var(--text-xs)] font-mono bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius-md)] p-3 whitespace-pre-wrap break-words text-[var(--color-text-primary)] max-h-48 overflow-auto">
               {formatPreview(
                 event,
                 {
@@ -389,6 +389,16 @@ export function ReportEventDialog({ eventId, onClose }: ReportEventDialogProps) 
                 disabled={busy}
                 className="w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-[var(--text-sm)] text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
               />
+              <div
+                className={`text-[var(--text-xs)] text-right mt-1 ${
+                  notes.length > MAX_NOTES * 0.95
+                    ? 'text-[var(--color-error)]'
+                    : 'text-[var(--color-text-muted)]'
+                }`}
+                aria-live="polite"
+              >
+                {notes.length}/{MAX_NOTES}
+              </div>
             </label>
 
             <fieldset className="space-y-2.5" disabled={busy}>
@@ -430,6 +440,15 @@ export function ReportEventDialog({ eventId, onClose }: ReportEventDialogProps) 
             ) : null}
 
             <div className="flex items-center justify-end gap-2">
+              {busy ? (
+                <span
+                  role="status"
+                  aria-live="polite"
+                  className="text-[var(--text-xs)] text-[var(--color-text-muted)] mr-auto"
+                >
+                  {t('diagnostics.report.generating')}
+                </span>
+              ) : null}
               <button
                 type="button"
                 onClick={onClose}
