@@ -159,6 +159,11 @@
     },
     "providers": {
       "sectionTitle": "API Providers",
+      "chatgptLogin": {
+        "title": "Sign in with ChatGPT subscription",
+        "description": "Use your ChatGPT Plus / Pro / Team plan quota to call Codex models (gpt-5.3-codex and friends) — no API key needed. Still polishing, shipping in the next release.",
+        "comingSoon": "Coming soon"
+      },
       "addProvider": "Add provider",
       "addCustom": "Add custom",
       "empty": "No providers configured yet. Add one to start generating.",

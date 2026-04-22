@@ -1,8 +1,7 @@
+import { useT } from '@open-codesign/i18n';
 import { Button } from '@open-codesign/ui';
-import { Loader2, LogOut, Sparkles } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { Sparkles } from 'lucide-react';
 import type { CodexOAuthStatus } from '../../../preload/index';
-import { useCodesignStore } from '../store';
 
 export interface ChatgptLoginCardProps {
   /** Called after a successful login or logout so the parent can refresh its provider list. */
@@ -78,107 +77,29 @@ export async function performLogout(deps: PerformLogoutDeps): Promise<boolean> {
   }
 }
 
-export function ChatgptLoginCard({ onStatusChange }: ChatgptLoginCardProps) {
-  const pushToast = useCodesignStore((s) => s.pushToast);
-  const [status, setStatus] = useState<CodexOAuthStatus | null>(null);
-  const [loading, setLoading] = useState(false);
-  const mountedRef = useRef(true);
-
-  useEffect(() => {
-    mountedRef.current = true;
-    return () => {
-      mountedRef.current = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!window.codesign) return;
-    void window.codesign.codexOAuth
-      .status()
-      .then((s) => {
-        if (mountedRef.current) setStatus(s);
-      })
-      .catch(() => {
-        if (mountedRef.current) setStatus(null);
-      });
-  }, []);
-
-  const handleLogin = useCallback(async () => {
-    if (!window.codesign) return;
-    await performLogin({
-      api: window.codesign.codexOAuth,
-      setStatus: (s) => {
-        if (mountedRef.current) setStatus(s);
-      },
-      setLoading: (v) => {
-        if (mountedRef.current) setLoading(v);
-      },
-      pushToast,
-      ...(onStatusChange !== undefined ? { onStatusChange } : {}),
-    });
-  }, [onStatusChange, pushToast]);
-
-  const handleLogout = useCallback(async () => {
-    if (!window.codesign) return;
-    await performLogout({
-      api: window.codesign.codexOAuth,
-      setStatus: (s) => {
-        if (mountedRef.current) setStatus(s);
-      },
-      pushToast,
-      confirm: (message) => window.confirm(message),
-      ...(onStatusChange !== undefined ? { onStatusChange } : {}),
-    });
-  }, [onStatusChange, pushToast]);
-
-  const viewState = resolveViewState(status, loading);
-
-  if (viewState === 'logged-in' && status) {
-    return (
-      <div className="rounded-[var(--radius-lg)] border border-[var(--color-border)] border-l-[var(--size-accent-stripe)] border-l-[var(--color-accent)] bg-[var(--color-accent-tint)] px-[var(--space-3)] py-[var(--space-2_5)] flex items-center gap-[var(--space-3)]">
-        <div className="min-w-0 flex-1 flex items-center gap-2 flex-wrap">
-          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full border border-[var(--color-accent)] text-[var(--color-accent)] bg-transparent text-[var(--font-size-badge)] font-medium leading-none">
-            <Sparkles className="w-2.5 h-2.5" />
-            已登录 ChatGPT
-          </span>
-          {status.email !== null && status.email.length > 0 && (
-            <span className="text-[var(--text-xs)] text-[var(--color-text-muted)] truncate">
-              {status.email}
-            </span>
-          )}
-        </div>
-        <div className="shrink-0">
-          <Button variant="secondary" size="sm" onClick={() => void handleLogout()}>
-            <LogOut className="w-3.5 h-3.5" />
-            登出
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
+export function ChatgptLoginCard(_props: ChatgptLoginCardProps) {
+  const t = useT();
+  // Phase-1 WIP: feature is landing on feat/codex-chatgpt-oauth and is not
+  // yet stable against the real backend. Render a coming-soon notice so
+  // users don't try to log in, hit an opaque 400, and blame the app.
+  // Full implementation (login/logout/status hooks, performLogin/
+  // performLogout helpers) stays exported below so the feature branch can
+  // flip this back on with a one-line change.
   return (
     <div className="rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] px-[var(--space-3)] py-[var(--space-2_5)] flex items-start gap-[var(--space-3)]">
       <div className="min-w-0 flex-1">
         <div className="text-[var(--text-sm)] font-medium text-[var(--color-text-primary)]">
-          用 ChatGPT 订阅登录
+          {t('settings.providers.chatgptLogin.title')}
         </div>
         <p className="text-[var(--text-xs)] text-[var(--color-text-muted)] mt-0.5 leading-[var(--leading-body)]">
-          登录后可以直接用你的 ChatGPT Plus/Pro/Team 订阅额度调用 Codex 模型（gpt-5.3-codex
-          等），无需 API key。
+          {t('settings.providers.chatgptLogin.description')}
         </p>
       </div>
       <div className="shrink-0">
-        {viewState === 'loading' ? (
-          <Button variant="primary" size="sm" disabled>
-            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            已打开浏览器，完成授权后自动返回…
-          </Button>
-        ) : (
-          <Button variant="primary" size="sm" onClick={() => void handleLogin()}>
-            <Sparkles className="w-3.5 h-3.5" />用 ChatGPT 订阅登录
-          </Button>
-        )}
+        <Button variant="secondary" size="sm" disabled>
+          <Sparkles className="w-3.5 h-3.5" />
+          {t('settings.providers.chatgptLogin.comingSoon')}
+        </Button>
       </div>
     </div>
   );

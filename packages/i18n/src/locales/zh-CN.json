@@ -160,6 +160,11 @@
     },
     "providers": {
       "sectionTitle": "API 服务",
+      "chatgptLogin": {
+        "title": "用 ChatGPT 订阅登录",
+        "description": "直接用你的 ChatGPT Plus / Pro / Team 订阅额度调用 Codex 模型（gpt-5.3-codex 等），无需 API key。功能仍在打磨中，下个版本开放。",
+        "comingSoon": "正在支持中"
+      },
       "addProvider": "添加服务",
       "addCustom": "添加自定义",
       "empty": "还没有配置任何服务，添加一个即可开始生成。",

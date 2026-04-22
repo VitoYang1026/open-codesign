@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import { type ValidateResult, pingProvider } from '@open-codesign/providers';
 import {
   BUILTIN_PROVIDERS,
@@ -17,10 +18,11 @@ import {
   isSupportedOnboardingProvider,
   modelsEndpointUrl,
 } from '@open-codesign/shared';
+import { buildAuthHeadersForWire } from './auth-headers';
 import { defaultConfigDir, readConfig, writeConfig } from './config';
 import { dialog, ipcMain, shell } from './electron-runtime';
 import { type ClaudeCodeImport, readClaudeCodeSettings } from './imports/claude-code-config';
-import { type CodexImport, readCodexConfig } from './imports/codex-config';
+import { type CodexImport, codexAuthPath, readCodexConfig } from './imports/codex-config';
 import { buildSecretRef, decryptSecret, migrateSecrets, tryBuildSecretRef } from './keychain';
 import { defaultLogsDir, getLogger } from './logger';
 import {
@@ -749,10 +751,23 @@ interface ExternalConfigsDetection {
   claudeCode?: ClaudeCodeDetectionMeta;
 }
 
+async function detectChatgptSubscription(): Promise<boolean> {
+  try {
+    const raw = await readFile(codexAuthPath(), 'utf8');
+    const parsed: unknown = JSON.parse(raw);
+    if (typeof parsed !== 'object' || parsed === null) return false;
+    return (parsed as Record<string, unknown>)['auth_mode'] === 'chatgpt';
+  } catch {
+    return false;
+  }
+}
+
 async function runImportCodex(imported: CodexImport): Promise<OnboardingState> {
   if (imported.providers.length === 0) {
     throw new CodesignError(
-      'Codex config has no providers to bring in',
+      (await detectChatgptSubscription())
+        ? 'Detected Codex ChatGPT subscription login (auth_mode: chatgpt). It cannot be imported as an API-key provider yet — the "Sign in with ChatGPT subscription" feature is still being polished and will ship in the next release. For now, configure [model_providers] in ~/.codex/config.toml manually, or switch to API-key mode in Codex. / 检测到 Codex 使用 ChatGPT 订阅登录，无法自动导入为 API key provider。"用 ChatGPT 订阅登录"功能仍在打磨中，下个版本开放 —— 目前请在 ~/.codex/config.toml 里手动配置 [model_providers]，或改用 API key 登录 Codex。'
+        : 'No importable API provider found in Codex config (~/.codex/config.toml is missing a [model_providers] section). / Codex 配置里没有可导入的 API provider（~/.codex/config.toml 里缺少 [model_providers] 段）。',
       ERROR_CODES.CONFIG_MISSING,
     );
   }
@@ -892,10 +907,7 @@ async function runListEndpointModels(raw: unknown): Promise<ListEndpointModelsRe
     return { ok: false, error: 'apiKey required' };
   }
   const url = modelsEndpointUrl(baseUrl, parsedWire.data);
-  const headers: Record<string, string> =
-    parsedWire.data === 'anthropic'
-      ? { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' }
-      : { authorization: `Bearer ${apiKey}` };
+  const headers = buildAuthHeadersForWire(parsedWire.data, apiKey, undefined, baseUrl);
   try {
     const res = await fetch(url, {
       method: 'GET',

@@ -218,16 +218,30 @@ Add a `SKILL.md` to any project to teach the model your own taste.
 
 ---
 
-## What’s next
+## Roadmap
 
-| Feature | Status |
-|---|---|
-| Cost transparency — pre-generation estimate + weekly budget (per-generation token count already shipped) | 🔜 Coming |
-| Version snapshots + side-by-side diff | 🔜 Coming |
-| Codebase → design system (token extraction) | 🔜 Coming |
-| Three-style parallel exploration | 🔜 Coming |
-| Code-signing (Apple ID + Authenticode) + opt-in auto-update | 🔜 v0.5 |
-| Figma layer export | 🔜 Post-1.0 |
+We're on v0.1.3 — shipping fast, priorities can shift. This is what's on the bench right now.
+
+### Now — v0.1.x polish
+
+- **Provider & API config polish** — smoother one-click import, model picker reaching the last gaps (custom providers, timeouts), clearer connection diagnostics
+- **Structured logging + issue-report bundle** — better logs in the main/renderer processes and a one-click diagnostics export that makes bug reports actionable
+
+### Next — v0.2 (headline theme: filesystem & import)
+
+- **Filesystem support** — read/write real project directories, not just in-app scratch space
+- **Broader import paths** — bring existing assets, prompts, and project context into a design session
+
+### Later — v0.3 and beyond
+
+- Cost transparency — pre-generation estimate + weekly budget (per-generation token count already shipped)
+- Version snapshots + side-by-side diff
+- Three-style parallel exploration
+- Codebase → design system (token extraction)
+- Code-signing (Apple ID + Authenticode) + opt-in auto-update — v0.5
+- Figma layer export — post-1.0
+
+Have a different priority in mind? [Open an issue](https://github.com/OpenCoworkAI/open-codesign/issues/new/choose) or 👍 an existing one — we do read them.
 
 ---
 
