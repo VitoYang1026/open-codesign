@@ -77,6 +77,18 @@ describe('composeSummaryMarkdown', () => {
     expect(md).not.toContain('at c (c.ts)');
   });
 
+  it('stack with paren-less frames is redacted when includePaths=false', () => {
+    const stack = [
+      'Error: top-level',
+      '    at /Users/hq/Documents/Github/codesign/dist/main.js:12:7',
+    ].join('\n');
+    const md = composeSummaryMarkdown(
+      baseInput({ event: baseEvent({ stack }), includePaths: false }),
+    );
+    expect(md).not.toContain('/Users/hq');
+    expect(md).not.toContain('/dist/main.js');
+  });
+
   it('renders timeline as a table with relative-second offsets newest-first', () => {
     const eventTs = Date.UTC(2026, 0, 1, 12, 0, 0);
     const timeline: ActionTimelineEntry[] = [

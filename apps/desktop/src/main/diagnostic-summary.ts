@@ -39,7 +39,7 @@ export function composeSummaryMarkdown(input: SummaryInput): string {
   const transient = event.transient ? 'yes' : 'no';
 
   const message = redact(event.message, input);
-  const stackSection = renderStack(event.stack);
+  const stackSection = renderStack(event.stack, input);
   const upstreamSection = renderUpstream(event, input);
   const timelineSection = renderTimeline(input);
   const logSection = renderLogTail(input);
@@ -90,7 +90,7 @@ export function composeSummaryMarkdown(input: SummaryInput): string {
   return capLength(body);
 }
 
-function renderStack(stack: string | undefined): string {
+function renderStack(stack: string | undefined, input?: SummaryInput): string {
   if (typeof stack !== 'string' || stack.trim().length === 0) {
     return '```\n(no stack)\n```';
   }
@@ -102,7 +102,18 @@ function renderStack(stack: string | undefined): string {
     if (frames.length >= 5) break;
   }
   if (frames.length === 0) return '```\n(no stack)\n```';
-  return ['```', ...frames, '```'].join('\n');
+  // Defense-in-depth: even if normalizeFrame misses an exotic form, run the
+  // path/url redactor so disabled toggles are honored at the rendered layer.
+  const redacted =
+    input !== undefined && (!input.includePaths || !input.includeUrls)
+      ? frames.map((line) =>
+          redactPathsAndUrls(line, {
+            includePaths: input.includePaths,
+            includeUrls: input.includeUrls,
+          }),
+        )
+      : frames;
+  return ['```', ...redacted, '```'].join('\n');
 }
 
 function renderUpstream(event: DiagnosticEventRow, input: SummaryInput): string | undefined {

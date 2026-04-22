@@ -81,5 +81,18 @@ export function normalizeFrame(frame: string): string {
   //   at /Users/x/foo.js:1:1
   //     -> at foo.js
   const withoutLineCol = frame.replace(/:\d+:\d+\)?$/, (m) => (m.endsWith(')') ? ')' : ''));
-  return withoutLineCol.replace(/\(([^()]*[\\/])?([^()\\/:]+)(?::\d+(?::\d+)?)?\)/, '($2)');
+  const withParenReplaced = withoutLineCol.replace(
+    /\(([^()]*[\\/])?([^()\\/:]+)(?::\d+(?::\d+)?)?\)/,
+    '($2)',
+  );
+  // Paren-less `at /path/to/file.js` (V8 emits this for top-level frames).
+  // Keep basename only so absolute paths never escape the fingerprint input
+  // or the rendered stack block.
+  if (
+    /^\s*at\s+[\\/~][^\s()]+$/.test(withParenReplaced) ||
+    /^\s*at\s+[A-Za-z]:\\[^\s()]+$/.test(withParenReplaced)
+  ) {
+    return withParenReplaced.replace(/[\\/]/g, '/').replace(/^\s*at\s+.*\/([^/]+)$/, 'at $1');
+  }
+  return withParenReplaced;
 }

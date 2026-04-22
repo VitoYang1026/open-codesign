@@ -80,7 +80,15 @@ describe('normalizeFrame', () => {
     );
   });
 
-  it('handles frames without a parenthesized path', () => {
-    expect(normalizeFrame('at /Users/x/proj/src/foo.js:1:1')).toBe('at /Users/x/proj/src/foo.js');
+  it('strips paths from paren-less frames like `at /Users/foo/bar.js`', () => {
+    expect(normalizeFrame('at /Users/x/proj/src/foo.js:1:1')).toBe('at foo.js');
+  });
+
+  it('strips paths from paren-less Windows frames', () => {
+    expect(normalizeFrame('at C:\\Users\\x\\proj\\foo.js:1:1')).toBe('at foo.js');
+  });
+
+  it('strips paths from paren-less ~/ frames', () => {
+    expect(normalizeFrame('at ~/proj/src/foo.js:1:1')).toBe('at foo.js');
   });
 });
