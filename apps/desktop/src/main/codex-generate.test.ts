@@ -68,9 +68,7 @@ function makeStore(): CodexTokenStore {
 }
 
 describe('runCodexGenerate', () => {
-  it(
-    'throws PROVIDER_AUTH_MISSING when no stored auth',
-    async () => {
+  it('throws PROVIDER_AUTH_MISSING when no stored auth', async () => {
     const { runCodexGenerate } = await import('./codex-generate');
     const store = makeStore();
     await expect(
@@ -86,9 +84,7 @@ describe('runCodexGenerate', () => {
     ).rejects.toMatchObject({
       code: ERROR_CODES.PROVIDER_AUTH_MISSING,
     });
-    },
-    15_000,
-  );
+  }, 15_000);
 
   it('returns artifacts when CodexClient.chat yields artifact text', async () => {
     const { runCodexGenerate } = await import('./codex-generate');
