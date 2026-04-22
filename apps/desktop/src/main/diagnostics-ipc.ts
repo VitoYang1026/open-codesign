@@ -349,7 +349,22 @@ function buildIssueUrl(params: {
   const { event, summaryMarkdown, bundlePath } = params;
   const base = `${GITHUB_REPO_URL}/issues/new`;
   const title = `[bug] ${event.code} (fp: ${event.fingerprint})`;
-  const bodyRaw = `${summaryMarkdown}\n\n<!-- bundle attached at: ${bundlePath} -->`;
+  // Visible attach instruction. summary.md is English-only today, so keep
+  // this English too — a bilingual block would drift from it. Better an
+  // unambiguous English line than an invisible HTML comment.
+  const attachBlock = [
+    '',
+    '## Diagnostic bundle',
+    '',
+    'Please attach the diagnostic zip to this issue so we can see the full log:',
+    '',
+    `\`${bundlePath}\``,
+    '',
+    '(Drag the file from Finder / Explorer into the issue comment box below.)',
+    '',
+    `<!-- bundle attached at: ${bundlePath} -->`,
+  ].join('\n');
+  const bodyRaw = `${summaryMarkdown}\n${attachBlock}`;
   const body =
     bodyRaw.length > GH_BODY_MAX
       ? `${bodyRaw.slice(0, GH_BODY_MAX)}\n\n_(truncated — see attached bundle: ${bundlePath})_`

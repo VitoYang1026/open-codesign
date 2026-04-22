@@ -242,6 +242,13 @@ describe('diagnostics:v1:reportEvent', () => {
     expect(result.issueUrl).toContain('labels=bug%2Cdiagnostic-auto');
     expect(result.issueUrl).toContain(encodeURIComponent('[bug] SOMETHING_BROKE'));
     expect(result.issueUrl).toContain(encodeURIComponent('fp: fp-deadbeef'));
+
+    // Visible attach instruction — the bundle path has to be readable as
+    // markdown on GitHub, not hidden in an HTML comment.
+    const decodedBody = decodeURIComponent(new URL(result.issueUrl).searchParams.get('body') ?? '');
+    expect(decodedBody).toContain('## Diagnostic bundle');
+    expect(decodedBody).toContain('attach the diagnostic zip');
+    expect(decodedBody).toContain(`\`${result.bundlePath}\``);
   });
 
   it('throws IPC_NOT_FOUND when event id missing', async () => {
