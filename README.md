@@ -124,7 +124,9 @@ Open source, desktop-native, and built for people who do not want their design w
 | macOS (Intel) | `open-codesign-*-x64.dmg` |
 | Windows (x64) | `open-codesign-*-x64-setup.exe` |
 | Windows (ARM64) | `open-codesign-*-arm64-setup.exe` |
-| Linux (x64) | `open-codesign-*-x64.AppImage` |
+| Linux (x64, AppImage) | `open-codesign-*-x64.AppImage` |
+| Linux (x64, Debian/Ubuntu) | `open-codesign-*-x64.deb` |
+| Linux (x64, Fedora/RHEL) | `open-codesign-*-x64.rpm` |
 
 Each release ships with `SHA256SUMS.txt` and a CycloneDX SBOM (`*-sbom.cdx.json`) so you can verify what you downloaded.
 

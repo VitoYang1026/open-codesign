@@ -66,6 +66,10 @@ linux:
   target:
     - target: AppImage
       arch: [x64]
+    - target: deb
+      arch: [x64]
+    - target: rpm
+      arch: [x64]
     # Snap is built in a separate, best-effort CI step (see
     # .github/workflows/release.yml) because snapcraft on ubuntu-latest
     # is heavyweight and occasionally flakes. The target config below is

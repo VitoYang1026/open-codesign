@@ -132,7 +132,10 @@ jobs:
           - os: windows-latest
             artifact_glob: 'apps/desktop/release/*.exe'
           - os: ubuntu-latest
-            artifact_glob: 'apps/desktop/release/*.AppImage'
+            artifact_glob: |
+              apps/desktop/release/*.AppImage
+              apps/desktop/release/*.deb
+              apps/desktop/release/*.rpm
     runs-on: ${{ matrix.os }}
     env:
       RELEASE_REF: ${{ github.event_name == 'push' && github.ref || format('refs/tags/{0}', inputs.tag) }}
@@ -153,6 +156,12 @@ jobs:
 
       - name: Install
         run: pnpm install --frozen-lockfile
+
+      # electron-builder's rpm target shells out to `rpmbuild`, which is not
+      # present on ubuntu-latest by default. Install it on Linux runners only.
+      - name: Install Linux packaging deps
+        if: matrix.os == 'ubuntu-latest'
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends rpm
 
       # Build all workspace packages (turborepo respects dep graph)
       - name: Build workspace

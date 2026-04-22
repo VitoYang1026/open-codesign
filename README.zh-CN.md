@@ -122,7 +122,9 @@ Open CoDesign 可以把一句自然语言提示词，直接变成一个完成度
 | macOS（Intel） | `open-codesign-*-x64.dmg` |
 | Windows（x64） | `open-codesign-*-x64-setup.exe` |
 | Windows（ARM64） | `open-codesign-*-arm64-setup.exe` |
-| Linux（x64） | `open-codesign-*-x64.AppImage` |
+| Linux（x64，AppImage） | `open-codesign-*-x64.AppImage` |
+| Linux（x64，Debian/Ubuntu） | `open-codesign-*-x64.deb` |
+| Linux（x64，Fedora/RHEL） | `open-codesign-*-x64.rpm` |
 
 每个 release 都会附带 `SHA256SUMS.txt` 和 CycloneDX SBOM（`*-sbom.cdx.json`），方便你校验下载内容。
 

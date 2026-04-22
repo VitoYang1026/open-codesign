@@ -33,7 +33,9 @@ winget install OpenCoworkAI.OpenCoDesign
 | macOS（Intel）| `open-codesign-*-x64.dmg` |
 | Windows（x64）| `open-codesign-*-x64-setup.exe` |
 | Windows（ARM64）| `open-codesign-*-arm64-setup.exe` |
-| Linux | `open-codesign-*-x64.AppImage` |
+| Linux（AppImage） | `open-codesign-*-x64.AppImage` |
+| Linux（Debian/Ubuntu） | `open-codesign-*-x64.deb` |
+| Linux（Fedora/RHEL） | `open-codesign-*-x64.rpm` |
 
 ::: tip v0.1 说明
 v0.1 安装包未签名。**macOS Sequoia 15+**：右键 → 打开 已绕不过 Gatekeeper，装完跑一次 `xattr -cr "/Applications/Open CoDesign.app"`（0.1.2 及之前路径是 `/Applications/open-codesign.app`）。**Windows**：SmartScreen → 更多信息 → 仍要运行。希望已验证的构建？从源码自行编译，参见[架构](../architecture)。

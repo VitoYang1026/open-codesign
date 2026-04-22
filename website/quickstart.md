@@ -33,7 +33,9 @@ Pick the matching installer from [GitHub Releases](https://github.com/OpenCowork
 | macOS (Intel) | `open-codesign-*-x64.dmg` |
 | Windows (x64) | `open-codesign-*-x64-setup.exe` |
 | Windows (ARM64) | `open-codesign-*-arm64-setup.exe` |
-| Linux | `open-codesign-*-x64.AppImage` |
+| Linux (AppImage) | `open-codesign-*-x64.AppImage` |
+| Linux (Debian/Ubuntu) | `open-codesign-*-x64.deb` |
+| Linux (Fedora/RHEL) | `open-codesign-*-x64.rpm` |
 
 ::: tip v0.1 note
 v0.1 installers are unsigned. **macOS Sequoia 15+**: right-click → Open no longer bypasses Gatekeeper; run `xattr -cr "/Applications/Open CoDesign.app"` once after installing (0.1.2 and earlier used `/Applications/open-codesign.app`). **Windows**: SmartScreen → More info → Run anyway. Prefer a verified build? Compile from source — see [Architecture](./architecture).
