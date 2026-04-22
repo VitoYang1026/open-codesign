@@ -296,10 +296,11 @@ export function ReportEventDialog({ localId, onClose }: ReportEventDialogProps) 
     setErr(null);
     try {
       const result = await reportDiagnosticEvent(buildReportInput(error, notes, include));
-      if (kind === 'open') {
-        // Await the external open BEFORE surfacing the "bundle saved" toast so
-        // a failing `openExternal` doesn't pair a green "saved" with a red error.
-        await window.codesign?.openExternal?.(result.issueUrl);
+      // Bundle is on disk regardless of whether the follow-up (browser open /
+      // clipboard write) succeeds. Show the "bundle saved" toast first so the
+      // user always has a path to the file, then do the side-effect — if the
+      // side-effect fails, append a helper toast with the recovery step.
+      const bundleToast = () =>
         pushToast({
           variant: 'info',
           title: t('diagnostics.report.bundleSavedTitle'),
@@ -311,20 +312,43 @@ export function ReportEventDialog({ localId, onClose }: ReportEventDialogProps) 
             },
           },
         });
+      if (kind === 'open') {
+        let openFailed = false;
+        try {
+          await window.codesign?.openExternal?.(result.issueUrl);
+        } catch {
+          openFailed = true;
+        }
+        bundleToast();
+        if (openFailed) {
+          pushToast({
+            variant: 'error',
+            title: t('diagnostics.report.openFailedTitle'),
+            description: t('diagnostics.report.openFailedCopyHint'),
+            action: {
+              label: t('diagnostics.report.copyIssueUrl'),
+              onClick: () => {
+                void navigator.clipboard?.writeText?.(result.issueUrl);
+              },
+            },
+          });
+        }
         onClose();
       } else {
-        await navigator.clipboard.writeText(result.summaryMarkdown);
-        pushToast({
-          variant: 'info',
-          title: t('diagnostics.report.bundleSavedTitle'),
-          description: `${t('diagnostics.report.bundleSavedDescription')} ${result.bundlePath}`,
-          action: {
-            label: t('diagnostics.report.revealBundle'),
-            onClick: () => {
-              void window.codesign?.diagnostics?.showItemInFolder?.(result.bundlePath);
-            },
-          },
-        });
+        let clipboardFailed = false;
+        try {
+          await navigator.clipboard.writeText(result.summaryMarkdown);
+        } catch {
+          clipboardFailed = true;
+        }
+        bundleToast();
+        if (clipboardFailed) {
+          pushToast({
+            variant: 'error',
+            title: t('diagnostics.report.clipboardFailedTitle'),
+            description: t('diagnostics.report.clipboardFailedHint'),
+          });
+        }
         setCopied(true);
         setTimeout(() => onClose(), 800);
       }
