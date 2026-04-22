@@ -14,6 +14,7 @@
  */
 
 import { type ChatMessage, CodesignError, ERROR_CODES, type ModelRef } from '@open-codesign/shared';
+import { normalizeProviderError } from './errors';
 import { type GenerateOptions, type GenerateResult, complete } from './index';
 
 export interface RetryReason {
@@ -28,6 +29,8 @@ export interface CompleteWithRetryOptions {
   maxRetries?: number;
   baseDelayMs?: number;
   onRetry?: (info: RetryReason) => void;
+  logger?: { warn: (event: string, data?: Record<string, unknown>) => void };
+  provider?: string;
 }
 
 const DEFAULT_MAX_RETRIES = 3;
@@ -224,7 +227,13 @@ export async function completeWithRetry(
     } catch (err) {
       lastError = err;
       const decision = classifyError(err);
+      const retryCount = attempt - 1;
+      const normalized = normalizeProviderError(err, retryOpts.provider ?? 'unknown', retryCount);
       if (shouldStop(decision, attempt, maxRetries)) {
+        retryOpts.logger?.warn(
+          'provider.error.final',
+          normalized as unknown as Record<string, unknown>,
+        );
         if (decision.reason === 'aborted') {
           throw new CodesignError('Generation aborted by user', ERROR_CODES.PROVIDER_ABORTED, {
             cause: err,
@@ -234,6 +243,7 @@ export async function completeWithRetry(
       }
       const info = buildRetryInfo(attempt, maxRetries, decision, baseDelayMs);
       onRetry?.(info);
+      retryOpts.logger?.warn('provider.error', normalized as unknown as Record<string, unknown>);
       await sleepWithAbort(info.delayMs, opts.signal);
     }
   }

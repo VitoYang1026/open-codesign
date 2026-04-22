@@ -132,4 +132,79 @@ describe('completeWithRetry', () => {
     await expect(promise).rejects.toThrow();
     expect(impl).toHaveBeenCalledTimes(1);
   });
+
+  it('emits provider.error on each retried attempt with incrementing retry_count', async () => {
+    const impl = vi
+      .fn()
+      .mockRejectedValueOnce(new HttpError('boom', 500))
+      .mockRejectedValueOnce(new HttpError('boom', 500))
+      .mockResolvedValueOnce(ok);
+    const logger = { warn: vi.fn() };
+    await completeWithRetry(
+      MODEL,
+      MESSAGES,
+      OPTS,
+      { baseDelayMs: 1, maxRetries: 5, logger, provider: 'anthropic' },
+      impl,
+    );
+    const retryCalls = logger.warn.mock.calls.filter((c) => c[0] === 'provider.error');
+    expect(retryCalls.length).toBe(2);
+    expect(retryCalls[0]?.[1]).toMatchObject({ upstream_status: 500, retry_count: 0 });
+    expect(retryCalls[1]?.[1]).toMatchObject({ upstream_status: 500, retry_count: 1 });
+  });
+
+  it('emits provider.error.final on retry exhaustion', async () => {
+    const impl = vi.fn().mockRejectedValue(new HttpError('still down', 500));
+    const logger = { warn: vi.fn() };
+    await expect(
+      completeWithRetry(MODEL, MESSAGES, OPTS, { baseDelayMs: 1, maxRetries: 3, logger }, impl),
+    ).rejects.toThrow(/still down/);
+    const lastCall = logger.warn.mock.calls.at(-1);
+    expect(lastCall?.[0]).toBe('provider.error.final');
+    expect(lastCall?.[1]).toMatchObject({ upstream_status: 500, retry_count: 2 });
+  });
+
+  it('works without a logger (logger is optional)', async () => {
+    const impl = vi
+      .fn()
+      .mockRejectedValueOnce(new HttpError('boom', 503))
+      .mockResolvedValueOnce(ok);
+    const out = await completeWithRetry(MODEL, MESSAGES, OPTS, { baseDelayMs: 1 }, impl);
+    expect(out).toEqual(ok);
+  });
+
+  it('passes provider name through to the normalized payload', async () => {
+    const impl = vi.fn().mockRejectedValue(new HttpError('bad', 401));
+    const logger = { warn: vi.fn() };
+    await expect(
+      completeWithRetry(
+        MODEL,
+        MESSAGES,
+        OPTS,
+        { baseDelayMs: 1, logger, provider: 'anthropic' },
+        impl,
+      ),
+    ).rejects.toThrow();
+    expect(logger.warn).toHaveBeenCalledWith(
+      'provider.error.final',
+      expect.objectContaining({ upstream_provider: 'anthropic' }),
+    );
+  });
+
+  it('captures upstream_request_id from response headers', async () => {
+    const impl = vi
+      .fn()
+      .mockRejectedValueOnce(new HttpError('throttled', 429, { 'x-request-id': 'req_test' }))
+      .mockResolvedValueOnce(ok);
+    const logger = { warn: vi.fn() };
+    await completeWithRetry(
+      MODEL,
+      MESSAGES,
+      OPTS,
+      { baseDelayMs: 1, logger, provider: 'openai' },
+      impl,
+    );
+    const firstCall = logger.warn.mock.calls.find((c) => c[0] === 'provider.error');
+    expect(firstCall?.[1]).toMatchObject({ upstream_request_id: 'req_test' });
+  });
 });
