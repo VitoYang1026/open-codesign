@@ -1,7 +1,7 @@
-import { readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import type { ProviderEntry } from '@open-codesign/shared';
+import { safeReadImportFile } from './safe-read';
 
 /**
  * One-click import for the Gemini CLI (`github.com/google-gemini/gemini-cli`).
@@ -142,13 +142,9 @@ export function parseDotEnv(content: string): Record<string, string> {
 async function readEnvFileIfPresent(
   path: string,
 ): Promise<{ vars: Record<string, string>; skipped: string[] } | null> {
-  try {
-    const raw = await readFile(path, 'utf8');
-    return parseDotEnvLines(raw);
-  } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return null;
-    throw err;
-  }
+  const raw = await safeReadImportFile(path);
+  if (raw === null) return null;
+  return parseDotEnvLines(raw);
 }
 
 /** Look through the skipped-lines output of parseDotEnvLines for entries

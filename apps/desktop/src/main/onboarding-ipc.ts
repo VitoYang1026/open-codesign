@@ -27,7 +27,12 @@ import { buildAuthHeadersForWire } from './auth-headers';
 import { defaultConfigDir, readConfig, writeConfig } from './config';
 import { dialog, ipcMain, shell } from './electron-runtime';
 import { type ClaudeCodeImport, readClaudeCodeSettings } from './imports/claude-code-config';
-import { type CodexImport, codexAuthPath, readCodexConfig } from './imports/codex-config';
+import {
+  ALLOWED_IMPORT_ENV_KEYS,
+  type CodexImport,
+  codexAuthPath,
+  readCodexConfig,
+} from './imports/codex-config';
 import { type GeminiImport, readGeminiCliConfig } from './imports/gemini-cli-config';
 import { type OpencodeImport, readOpencodeConfig } from './imports/opencode-config';
 import { buildSecretRef, decryptSecret, migrateSecrets } from './keychain';
@@ -141,8 +146,20 @@ export function getApiKeyForProvider(provider: string): string {
   //      throwing a misleading "key missing" error.
   const entry = cfg.providers[provider];
   if (entry?.envKey !== undefined) {
-    const fromEnv = process.env[entry.envKey]?.trim();
-    if (fromEnv !== undefined && fromEnv.length > 0) return fromEnv;
+    // Defense in depth against legacy configs: Codex's config.toml env_key
+    // field is now allowlisted at import time, but older configs may have
+    // stored arbitrary env-var names (pre-allowlist). Re-check here so a
+    // stale `envKey: "AWS_SECRET_ACCESS_KEY"` can't still exfiltrate on
+    // every LLM call.
+    if (!ALLOWED_IMPORT_ENV_KEYS.has(entry.envKey)) {
+      logger.warn('get_api_key.envKey_blocked', {
+        provider,
+        envKey: entry.envKey,
+      });
+    } else {
+      const fromEnv = process.env[entry.envKey]?.trim();
+      if (fromEnv !== undefined && fromEnv.length > 0) return fromEnv;
+    }
   }
 
   throw new CodesignError(
@@ -822,7 +839,7 @@ async function runImportCodex(imported: CodexImport): Promise<OnboardingState> {
       const envValue = process.env[entry.envKey]?.trim();
       if (envValue !== undefined && envValue.length > 0) {
         // buildSecretRef throws only on empty input — length is already
-        // guarded. Bare call instead of `tryBuildSecretRef` so any future
+        // guarded. Bare call instead of wrapping in try/catch so any future
         // invariant break fails loudly rather than quietly writing a row
         // with no key and reporting success.
         nextSecrets[entry.id] = buildSecretRef(envValue);

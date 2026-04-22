@@ -120,7 +120,7 @@ export function toProviderRows(
       // Prefer the persisted mask — avoids triggering a keychain password
       // prompt on unsigned macOS builds just to render the Settings row.
       // Fall back to decrypting once for legacy configs that pre-date the
-      // mask field; `migrateSecretMasks` should have rewritten them, but
+      // mask field; `migrateSecrets` should have rewritten them, but
       // we stay resilient in case migration didn't complete.
       if (ref.mask !== undefined && ref.mask.length > 0) {
         maskedKey = ref.mask;
