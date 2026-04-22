@@ -173,30 +173,41 @@ function registerIpcHandlers(db: Database | null): void {
 
   /** Adapter so `core` can log step events through the same scoped electron-log
    * sink the IPC handler uses. Keeps a single timeline per generation in the
-   * log file without forcing `core` to depend on electron-log. */
+   * log file without forcing `core` to depend on electron-log.
+   *
+   * Only `provider.error` (retry in flight, transient=true) is persisted from
+   * this adapter; the `provider.error.final` event is NOT recorded because the
+   * outer handler's catch block calls `recordFinalError` — recording both
+   * would double-count the same failure with two distinct fingerprints. */
   const coreLoggerFor = (id: string): CoreLogger => ({
     info: (event, data) => logIpc.info(event, { generationId: id, ...(data ?? {}) }),
     warn: (event, data) => {
       logIpc.warn(event, { generationId: id, ...(data ?? {}) });
-      if ((event === 'provider.error' || event === 'provider.error.final') && db !== null) {
-        const transient = event === 'provider.error';
+      if (event === 'provider.error' && db !== null) {
         const code = 'PROVIDER_UPSTREAM_ERROR';
         const upstream =
           data !== undefined && typeof data['upstream_message'] === 'string'
             ? (data['upstream_message'] as string)
             : event;
+        // Fingerprint basis: errorCode + synthetic frame containing the two
+        // fields that truly differentiate provider errors — upstream_status
+        // and upstream_code. JSON-stringifying `data` and passing it as
+        // `stack` would produce an identical 8-hex for every provider error
+        // because `extractTopFrames` requires lines starting with "at ".
+        const status = typeof data?.['upstream_status'] === 'number' ? data['upstream_status'] : '?';
+        const upstreamCode =
+          typeof data?.['upstream_code'] === 'string' ? data['upstream_code'] : 'unknown';
+        const syntheticFrame = `    at provider (${status}:${upstreamCode})`;
         recordDiagnosticEvent(db, {
           level: 'warn',
           code,
           scope: 'provider',
           runId: id,
-          fingerprint: computeFingerprint({
-            errorCode: code,
-            stack: JSON.stringify(data ?? {}),
-          }),
+          fingerprint: computeFingerprint({ errorCode: code, stack: syntheticFrame }),
           message: upstream,
           stack: undefined,
-          transient,
+          transient: true,
+          ...(data !== undefined ? { context: data } : {}),
         });
       }
     },
@@ -857,7 +868,7 @@ function registerIpcHandlers(db: Database | null): void {
           message: err instanceof Error ? err.message : String(err),
           code: err instanceof CodesignError ? err.code : undefined,
         });
-        recordFinalError('generate', runId, err);
+        recordFinalError('apply-comment', runId, err);
         throw err;
       }
     });
@@ -914,7 +925,7 @@ function registerIpcHandlers(db: Database | null): void {
           message: err instanceof Error ? err.message : String(err),
           code: err instanceof CodesignError ? err.code : undefined,
         });
-        recordFinalError('generate', runId, err);
+        recordFinalError('title', runId, err);
         throw err;
       }
     });

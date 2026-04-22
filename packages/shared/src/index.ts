@@ -344,6 +344,14 @@ export interface DiagnosticEventInput {
   message: string;
   stack: string | undefined;
   transient: boolean;
+  /**
+   * Arbitrary JSON-serializable payload attached to the event — typically the
+   * `NormalizedProviderError` from `retry.ts` (upstream_status, request_id,
+   * retry_count, redacted_body_head). Stored as JSON TEXT in the
+   * `context_json` column so the Report dialog can render structured fields
+   * without reparsing main.log.
+   */
+  context?: Record<string, unknown>;
 }
 
 export interface DiagnosticEventRow {
@@ -359,6 +367,8 @@ export interface DiagnosticEventRow {
   stack: string | undefined;
   transient: boolean;
   count: number;
+  /** Parsed JSON from the `context_json` column. May be undefined. */
+  context: Record<string, unknown> | undefined;
 }
 
 /**

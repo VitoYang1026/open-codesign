@@ -221,6 +221,18 @@ function applyAdditiveMigrations(db: Database): void {
     db.exec('ALTER TABLE comments ADD COLUMN parent_outer_html TEXT');
   }
 
+  // diagnostic_events v2 — add `context_json` (TEXT, nullable) so rows from
+  // provider errors can persist the full NormalizedProviderError payload
+  // (upstream_request_id, upstream_status, retry_count, redacted_body_head).
+  // Nullable so existing rows keep working; renderer deserializes JSON when
+  // rendering the Report dialog.
+  const diagEventCols = (
+    db.prepare('PRAGMA table_info(diagnostic_events)').all() as ColumnInfo[]
+  ).map((c) => c.name);
+  if (!diagEventCols.includes('context_json')) {
+    db.exec('ALTER TABLE diagnostic_events ADD COLUMN context_json TEXT');
+  }
+
   // One-shot cleanup: chat_messages rows written before the designId race
   // fixes (commits 2a316b7 / f41d1f8) may carry the wrong design_id and
   // cross-contaminate the Sidebar history. Clear the table once; the next
@@ -1055,9 +1067,21 @@ interface DiagnosticEventRowDb {
   stack: string | null;
   transient: number;
   count: number;
+  context_json: string | null;
 }
 
 function rowToDiagnosticEvent(row: DiagnosticEventRowDb): DiagnosticEventRow {
+  let context: Record<string, unknown> | undefined;
+  if (row.context_json !== null && row.context_json.length > 0) {
+    try {
+      const parsed: unknown = JSON.parse(row.context_json);
+      if (parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        context = parsed as Record<string, unknown>;
+      }
+    } catch {
+      // Corrupt JSON — ignore rather than crash the list view.
+    }
+  }
   return {
     id: row.id,
     schemaVersion: 1,
@@ -1071,6 +1095,7 @@ function rowToDiagnosticEvent(row: DiagnosticEventRowDb): DiagnosticEventRow {
     stack: row.stack ?? undefined,
     transient: row.transient === 1,
     count: row.count,
+    context,
   };
 }
 
@@ -1098,8 +1123,8 @@ export function recordDiagnosticEvent(
 
   db.prepare(
     `INSERT INTO diagnostic_events
-       (schema_version, ts, level, code, scope, run_id, fingerprint, message, stack, transient, count)
-     VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
+       (schema_version, ts, level, code, scope, run_id, fingerprint, message, stack, transient, count, context_json)
+     VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)`,
   ).run(
     ts,
     input.level,
@@ -1110,6 +1135,7 @@ export function recordDiagnosticEvent(
     input.message,
     input.stack ?? null,
     input.transient ? 1 : 0,
+    input.context !== undefined ? JSON.stringify(input.context) : null,
   );
 }
 
