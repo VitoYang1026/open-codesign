@@ -220,6 +220,7 @@ export default defineConfig({
       },
       { text: 'Architecture', link: '/architecture' },
       { text: 'Roadmap', link: '/roadmap' },
+      { text: 'FAQ', link: '/faq' },
       {
         text: 'Changelog',
         link: 'https://github.com/OpenCoworkAI/open-codesign/blob/main/CHANGELOG.md',
